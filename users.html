@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Usuarios - Inventarios</title>
+    <link rel="stylesheet" href="estilo.css">
+    <script src="auth.js" defer></script>
+    <style>.container{max-width:900px;margin:40px auto;padding:20px;background:#fff;border-radius:8px} .user-row{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee}</style>
+</head>
+<body>
+    <div class="container">
+        <h2>Usuarios registrados</h2>
+        <div id="authInfo" class="status-message" style="display:block;margin-bottom:12px"></div>
+        <div id="usersList"></div>
+        <div style="margin-top:12px">
+            <button id="logoutBtn" class="btn danger-btn">Cerrar sesión</button>
+            <a href="index.html" style="margin-left:12px" class="btn secondary-btn">Ir a la App</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const info = document.getElementById('authInfo');
+            const list = document.getElementById('usersList');
+            const logoutBtn = document.getElementById('logoutBtn');
+
+            const user = InvAuth.currentUser();
+            if(!user){
+                info.className='status-message warning';
+                info.innerText = 'Acceso denegado. Debes iniciar sesión para ver esta página.';
+                list.innerHTML = '<p>Sin acceso.</p>';
+                logoutBtn.style.display='none';
+                return;
+            }
+
+            info.className='status-message success';
+            info.innerText = 'Sesión iniciada como: ' + user;
+
+            const users = InvAuth.getUsers();
+            const rows = Object.keys(users).map(u=>{
+                const created = users[u] && users[u].created ? users[u].created : '-';
+                return `<div class="user-row"><div><strong>${u}</strong></div><div>Creado: ${created}</div></div>`;
+            }).join('');
+
+            list.innerHTML = rows || '<p>No hay usuarios.</p>';
+
+            logoutBtn.addEventListener('click', ()=>{
+                InvAuth.logout();
+                window.location.href = 'login.html';
+            });
+        });
+    </script>
+</body>
+</html>

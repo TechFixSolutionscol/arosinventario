@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Login - Inventarios</title>
+    <link rel="stylesheet" href="estilo.css">
+    <script src="auth.js" defer></script>
+    <style>
+        .auth-container{max-width:420px;margin:60px auto;padding:24px;border-radius:8px;background:var(--card-bg,#fff);box-shadow:0 6px 18px rgba(0,0,0,.06)}
+        .auth-actions{display:flex;gap:8px;margin-bottom:12px}
+        .hidden{display:none}
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2>Acceso - Inventarios</h2>
+        <div class="auth-actions">
+            <button id="showLoginBtn" class="btn secondary-btn">Iniciar sesión</button>
+        </div>
+
+        <form id="loginForm" class="form-grid">
+            <div class="form-group">
+                <label for="login_user">Usuario</label>
+                <input id="login_user" required>
+            </div>
+            <div class="form-group">
+                <label for="login_pass">Contraseña</label>
+                <input id="login_pass" type="password" required>
+            </div>
+            <button type="submit" class="btn primary-btn full-width">Iniciar sesión</button>
+            <div id="loginMessage" class="status-message" style="display:block;margin-top:10px"></div>
+        </form>
+
+        <!-- Registro público deshabilitado: la creación de usuarios se gestiona internamente -->
+
+        <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <a href="index.html" class="link-like">Ir a la App</a>
+            <a href="users.html" class="link-like">Ver usuarios</a>
+        </div>
+    </div>
+</body>
+</html>
