@@ -1,5 +1,5 @@
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5agDdMGez3d_D-cF09e9tnTGHAw-C_muzP9bWqKz3OtDQIYScdgpVQGdQIStLwlpYMA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyf_32xSTYhEmw49O4YW_PoZav2TNsVNARP-G015r6fR6NTxebpncQJVf7ID5aYNP0diw/exec';
 let cachedData = {
     productos: [],
     proveedores: [],
