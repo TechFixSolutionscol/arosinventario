@@ -1,45 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario</title>
-        <!-- Iconos de Font Awesome -->
+    <title>FixOps</title>
+    <!-- Iconos de Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <!-- Librería de Gráficos (Chart.js) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="estilo.css">
     <script src="auth.js"></script>
 </head>
+
 <body>
     <script>
         // Verificación automática: redirige a login si no hay usuario autenticado
-        document.addEventListener('DOMContentLoaded', ()=>{
-            try{
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
                 // Si `InvAuth` ya está disponible, usarla directamente
-                if(window.InvAuth && typeof window.InvAuth.currentUser === 'function'){
+                if (window.InvAuth && typeof window.InvAuth.currentUser === 'function') {
                     const u = window.InvAuth.currentUser();
-                    if(!u) location.href = 'login.html';
+                    if (!u) location.href = 'login.html';
                     return;
                 }
                 // Si no, esperar un momento por si `auth.js` se inicializa
-                setTimeout(()=>{
+                setTimeout(() => {
                     const u = window.InvAuth && typeof window.InvAuth.currentUser === 'function' ? window.InvAuth.currentUser() : null;
-                    if(!u) location.href = 'login.html';
+                    if (!u) location.href = 'login.html';
                 }, 200);
-            }catch(e){ /* no bloquear la app si hay error */ }
+            } catch (e) { /* no bloquear la app si hay error */ }
         });
     </script>
 
     <div class="dashboard-container">
-        <div id="authBox" style="position:fixed;top:12px;right:12px;background:var(--card-bg,#fff);padding:8px 12px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;display:flex;gap:8px;align-items:center">
+        <div id="authBox"
+            style="position:fixed;top:12px;right:12px;background:var(--card-bg,#fff);padding:8px 12px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;display:flex;gap:8px;align-items:center">
             <span id="currentUserLabel" style="font-weight:600;color:var(--primary-color)">Usuario: —</span>
             <button id="logoutBtn" class="btn secondary-btn" style="padding:6px 10px;">Cerrar sesión</button>
         </div>
         <!-- Barra Lateral -->
         <aside class="sidebar">
             <div class="logo">
-                <i class="fas fa-warehouse"></i> Inventario
+                <img src="assets/img/logo.png" alt="Logo" class="logo" width="200">
             </div>
             <nav class="sidebar-nav">
                 <a href="#dashboard" class="active" data-section="dashboard">
@@ -63,6 +66,12 @@
                 <a href="#resumenes" data-section="resumenes">
                     <i class="fas fa-list-alt"></i> Resúmenes
                 </a>
+                <a href="#contactos" data-section="contactos">
+                    <i class="fas fa-address-book"></i> Contactos
+                </a>
+                <a href="#usuarios" data-section="usuarios">
+                    <i class="fas fa-users"></i> Usuarios
+                </a>
                 <a href="#configuracion" data-section="configuracion">
                     <i class="fas fa-cog"></i> Configuración
                 </a>
@@ -71,11 +80,11 @@
 
         <!-- Contenido Principal -->
         <main class="main-content">
-            
+
             <!-- Sección 0: Dashboard (Gráficos) -->
             <section id="dashboard" class="content-section active">
                 <h2><i class="fas fa-chart-line"></i> Dashboard - Resumen Financiero</h2>
-                
+
                 <!-- Botones de control -->
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                     <button id="cargarDatosGraficosBtn" class="btn primary-btn">
@@ -85,7 +94,7 @@
                         <i class="fas fa-calculator"></i> Calcular Resumen
                     </button>
                 </div>
-                
+
                 <div id="statusDashboard" class="status-message"></div>
 
                 <!-- Estadísticas Resumen -->
@@ -120,30 +129,47 @@
                     <canvas id="tendenciasChart"></canvas>
                 </div>
             </section>
-            
+
             <!-- Las demás secciones se mantienen igual -->
             <!-- Sección 1: Inventario Actual -->
             <section id="inventario" class="content-section">
                 <h2><i class="fas fa-cubes"></i> Inventario Actual</h2>
-                <p>Lista de todos los productos y su stock disponible.</p>
-                <button id="cargarInventarioBtn" class="btn secondary-btn">
-                    <i class="fas fa-boxes"></i> Refrescar Inventario
-                </button>
+                <div class="table-actions" style="display:flex; gap:10px; margin: 20px 0; align-items: center;">
+                    <button id="cargarInventarioBtn" class="btn secondary-btn">
+                        <i class="fas fa-boxes"></i> Refrescar
+                    </button>
+                    <button id="exportInventarioBtn" class="btn secondary-btn"
+                        style="background: #27ae60; color: white; border: none;">
+                        <i class="fas fa-file-excel"></i> Exportar Excel
+                    </button>
+                    <div class="search-container" style="flex-grow:1; margin-bottom:0;">
+                        <div class="search-box"
+                            style="display:flex; align-items:center; background:white; padding:0 15px; border-radius:12px; border:1px solid #ddd;">
+                            <i class="fas fa-search" style="color:#666;"></i>
+                            <input type="text" id="searchInventario" placeholder="Buscar en inventario..."
+                                style="border:none; width:100%; padding:10px; outline:none;" autocomplete="off">
+                        </div>
+                        <div class="smart-dropdown"></div>
+                    </div>
+                </div>
                 <div id="statusInventario" class="status-message"></div>
                 <div style="max-height: 600px; overflow-y: auto;">
-                    <table class="data-table">
+                    <table class="data-table" id="inventarioTable">
                         <thead>
                             <tr>
                                 <th>ID</th>
                                 <th>Nombre</th>
                                 <th>Código</th>
                                 <th>Categoría</th>
+                                <th>Tipo</th>
                                 <th>Stock</th>
                                 <th>P. Venta</th>
                             </tr>
                         </thead>
                         <tbody id="inventarioTableBody">
-                            <tr><td colspan="6">Presiona "Refrescar Inventario" para cargar los datos.</td></tr>
+                            <tr>
+                                <td colspan="6">Presiona "Refrescar Inventario" para cargar los datos.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -152,7 +178,8 @@
             <!-- Sección 2: Registrar Producto -->
             <section id="productos" class="content-section">
                 <h2><i class="fas fa-box-open"></i> Registrar Nuevo Producto</h2>
-                <p class="status-message info" style="display:block;">El ID del producto se generará automáticamente.</p>
+                <p class="status-message info" style="display:block;">El ID del producto se generará automáticamente.
+                </p>
                 <form id="productoForm" class="form-grid">
                     <div class="form-group">
                         <label for="p_codigo">Código Único:</label>
@@ -169,6 +196,14 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label for="p_tipo">Tipo de Producto:</label>
+                        <select id="p_tipo" required>
+                            <option value="">Seleccionar tipo...</option>
+                            <option value="Inventariable" selected>Inventariable (con stock)</option>
+                            <option value="Servicio">Servicio (sin stock)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="p_precio_compra">Precio Compra:</label>
                         <input type="number" id="p_precio_compra" required min="0.01" step="0.01">
                     </div>
@@ -176,9 +211,9 @@
                         <label for="p_precio_venta">Precio Venta:</label>
                         <input type="number" id="p_precio_venta" required min="0.01" step="0.01">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="p_stock_group">
                         <label for="p_stock">Stock Inicial:</label>
-                        <input type="number" id="p_stock" required min="0">
+                        <input type="number" id="p_stock" required min="0" required ="1">
                     </div>
 
                     <button type="submit" class="btn primary-btn full-width">
@@ -187,7 +222,7 @@
                 </form>
                 <div id="statusProducto" class="status-message"></div>
             </section>
-            
+
             <!-- Las demás secciones permanecen igual... -->
             <!-- Sección 3: Categorías -->
             <section id="categorias" class="content-section">
@@ -202,89 +237,308 @@
                     </button>
                 </form>
                 <div id="statusCategoria" class="status-message"></div>
-                
+
                 <h3>Categorías Existentes:</h3>
                 <ul id="listaCategorias">
                     <li>Cargando...</li>
                 </ul>
             </section>
 
-            <!-- Sección 4: Compras -->
+            <!-- Sección: Contactos (Proveedores/Clientes) -->
+            <section id="contactos" class="content-section">
+                <h2><i class="fas fa-address-book"></i> Gestión de Contactos</h2>
+
+                <div class="form-grid">
+                    <!-- Formulario Proveedores -->
+                    <div class="card"
+                        style="padding:20px; border-radius:12px; background:rgba(255,255,255,0.5); border:1px solid #ddd;">
+                        <h3><i class="fas fa-truck"></i> Nuevo Proveedor</h3>
+                        <form id="proveedorForm" class="form-grid single-col">
+                            <div class="form-group">
+                                <label for="c_nombre_pr">Nombre del Proveedor:</label>
+                                <input type="text" id="c_nombre_pr" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="c_telefono_pr">Teléfono:</label>
+                                <input type="text" id="c_telefono_pr">
+                            </div>
+                            <button type="submit" class="btn secondary-btn full-width">Guardar Proveedor</button>
+                        </form>
+                    </div>
+
+                    <!-- Formulario Clientes -->
+                    <div class="card"
+                        style="padding:20px; border-radius:12px; background:rgba(255,255,255,0.5); border:1px solid #ddd;">
+                        <h3><i class="fas fa-user-friends"></i> Nuevo Cliente</h3>
+                        <form id="clienteForm" class="form-grid single-col">
+                            <div class="form-group">
+                                <label for="c_nombre_cl">Nombre del Cliente:</label>
+                                <input type="text" id="c_nombre_cl" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="c_telefono_cl">Teléfono:</label>
+                                <input type="text" id="c_telefono_cl">
+                            </div>
+                            <button type="submit" class="btn secondary-btn full-width">Guardar Cliente</button>
+                        </form>
+                    </div>
+                </div>
+                <div id="statusContactos" class="status-message"></div>
+
+                <div style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                    <div>
+                        <h4>Lista de Proveedores</h4>
+                        <ul id="listaProveedores" class="category-list">
+                            <li>Cargando...</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>Lista de Clientes</h4>
+                        <ul id="listaClientes" class="category-list">
+                            <li>Cargando...</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección 4: Compras (Pedido Multi-producto) -->
             <section id="compras" class="content-section">
-                <h2><i class="fas fa-truck-loading"></i> Registro de Compras (Añade Stock)</h2>
-                <form id="compraForm" class="form-grid">
-                    <div class="form-group">
-                        <label for="co_query">Buscar Producto (ID, Código o Nombre):</label>
-                        <input type="text" id="co_query" placeholder="Escriba para buscar y cargar datos" required>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="margin:0;"><i class="fas fa-truck-loading"></i> Pedido de Compra</h2>
+                        <span id="co_order_id" style="font-size: 1.5rem; font-weight: 800; color: #666;">P-00000</span>
                     </div>
-                    <div class="form-group">
-                        <label for="co_cantidad">Cantidad Comprada:</label>
-                        <input type="number" id="co_cantidad" required min="1">
+                    <div style="text-align: right;">
+                        <button type="button" class="btn primary-btn" id="co_submit_btn">
+                            <i class="fas fa-save"></i> Confirmar Compra
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="co_precio_compra">Precio Unitario de Compra:</label>
-                        <input type="number" id="co_precio_compra" required min="0.01" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label for="co_proveedor">Proveedor (Opcional):</label>
-                        <input type="text" id="co_proveedor">
-                    </div>
+                </div>
 
-                    <div class="product-details hidden full-width" id="co_product_details"></div>
-                    <input type="hidden" id="co_producto_id">
+                <div class="order-header">
+                    <div class="form-group">
+                        <label>Proveedor:</label>
+                        <select id="co_proveedor" placeholder="Escriba o elija proveedor">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Recepción:</label>
+                        <input type="date" id="co_fecha">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 25px;">
+                        <input type="checkbox" id="co_apply_iva" checked style="width: 20px; height: 20px;">
+                        <label for="co_apply_iva" style="margin:0; cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
+                    </div>
+                </div>
 
-                    <button type="submit" class="btn primary-btn full-width" id="co_submit_btn" disabled>
-                        <i class="fas fa-cart-plus"></i> Registrar Compra
+                <div style="overflow-x: auto;">
+                    <table class="order-table" id="co_items_table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%;">Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="co_items_body">
+                            <!-- Líneas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="line-actions">
+                    <button type="button" class="btn secondary-btn" id="co_add_line">
+                        <i class="fas fa-plus"></i> Agregar un producto
                     </button>
-                </form>
+                </div>
+
+                <div class="totals-section">
+                    <div class="total-row">
+                        <span>Base Imponible:</span>
+                        <span id="co_base_imponible">$0</span>
+                    </div>
+                    <div class="total-row">
+                        <span>IVA (19%):</span>
+                        <span id="co_iva">$0</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Total:</span>
+                        <span id="co_total">$0</span>
+                    </div>
+                </div>
+                <div style="clear: both;"></div>
                 <div id="statusCompra" class="status-message"></div>
             </section>
-            
-            <!-- Sección 5: Ventas -->
+
+            <!-- Sección 5: Ventas (Pedido Multi-producto) -->
             <section id="ventas" class="content-section">
-                <h2><i class="fas fa-cash-register"></i> Registro de Ventas (Resta Stock)</h2>
-                <form id="ventaForm" class="form-grid">
-                    <div class="form-group">
-                        <label for="v_query">Buscar Producto (ID, Código o Nombre):</label>
-                        <input type="text" id="v_query" required placeholder="Escriba para buscar y cargar datos">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="margin:0;"><i class="fas fa-cash-register"></i> Pedido de Venta</h2>
+                        <span id="v_order_id" style="font-size: 1.5rem; font-weight: 800; color: #666;">V-00000</span>
                     </div>
-                    <div class="form-group">
-                        <label for="v_cantidad">Cantidad Vendida:</label>
-                        <input type="number" id="v_cantidad" required min="1">
+                    <div style="text-align: right;">
+                        <button type="button" class="btn primary-btn" id="v_submit_btn">
+                            <i class="fas fa-check-circle"></i> Confirmar Venta
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="v_precio_venta">Precio Unitario de Venta:</label>
-                        <input type="number" id="v_precio_venta" required min="0.01" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label for="v_cliente">Cliente (Opcional):</label>
-                        <input type="text" id="v_cliente">
-                    </div>
+                </div>
 
-                    <div class="product-details hidden full-width" id="v_product_details"></div>
-                    <input type="hidden" id="v_producto_id">
+                <div class="order-header">
+                    <div class="form-group">
+                        <label>Cliente:</label>
+                        <select id="v_cliente" placeholder="Escriba o elija cliente">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Venta:</label>
+                        <input type="date" id="v_fecha">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 25px;">
+                        <input type="checkbox" id="v_apply_iva" checked style="width: 20px; height: 20px;">
+                        <label for="v_apply_iva" style="margin:0; cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
+                    </div>
+                </div>
 
-                    <button type="submit" class="btn primary-btn full-width" id="v_submit_btn" disabled>
-                        <i class="fas fa-hand-holding-usd"></i> Registrar Venta
+                <div style="overflow-x: auto;">
+                    <table class="order-table" id="v_items_table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%;">Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="v_items_body">
+                            <!-- Líneas dinámicas se insertan aquí -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="line-actions">
+                    <button type="button" class="btn secondary-btn" id="v_add_line">
+                        <i class="fas fa-plus"></i> Agregar un producto
                     </button>
-                </form>
+                </div>
+
+                <div class="totals-section">
+                    <div class="total-row">
+                        <span>Base Imponible:</span>
+                        <span id="v_base_imponible">$0</span>
+                    </div>
+                    <div class="total-row">
+                        <span>IVA (19%):</span>
+                        <span id="v_iva">$0</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Total:</span>
+                        <span id="v_total">$0</span>
+                    </div>
+                </div>
+                <div style="clear: both;"></div>
                 <div id="statusVenta" class="status-message"></div>
             </section>
 
             <!-- Sección 6: Resúmenes -->
             <section id="resumenes" class="content-section">
                 <h2><i class="fas fa-list-alt"></i> Resúmenes y Reportes</h2>
-                <div class="form-grid">
-                    <button id="resumenVentasBtn" class="btn secondary-btn"><i class="fas fa-chart-bar"></i> Ver Resumen de Ventas (Histórico)</button>
-                    <button id="resumenComprasBtn" class="btn secondary-btn"><i class="fas fa-chart-bar"></i> Ver Resumen de Compras (Histórico)</button>
+                <div class="form-grid"
+                    style="margin-bottom:20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    <button id="resumenVentasBtn" class="btn secondary-btn"><i class="fas fa-chart-bar"></i>
+                        Ventas</button>
+                    <button id="resumenComprasBtn" class="btn secondary-btn"><i class="fas fa-chart-bar"></i>
+                        Compras</button>
+                    <button id="exportResumenBtn" class="btn secondary-btn"
+                        style="background: #27ae60; color: white; border: none;"><i class="fas fa-file-excel"></i>
+                        Exportar Excel</button>
                 </div>
-                
+
+                <div class="search-box hidden" id="searchResumenBox" style="margin-bottom:20px;">
+                    <div class="search-container">
+                        <div
+                            style="display:flex; align-items:center; background:white; padding:0 15px; border-radius:12px; border:1px solid #ddd;">
+                            <i class="fas fa-search" style="color:#666;"></i>
+                            <input type="text" id="searchResumen" placeholder="Filtrar resultados..."
+                                style="border:none; width:100%; padding:10px; outline:none;" autocomplete="off">
+                        </div>
+                        <div class="smart-dropdown"></div>
+                    </div>
+                </div>
+
                 <div id="statusResumen" class="status-message"></div>
-                
+
                 <div style="max-height: 600px; overflow-y: auto; margin-top: 20px;">
                     <table class="data-table hidden" id="resumenTable">
                         <thead></thead>
                         <tbody id="resumenTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sección: Gestión de Usuarios -->
+            <section id="usuarios" class="content-section">
+                <h2><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+
+                <!-- Formulario de Nuevo Usuario -->
+                <div
+                    style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin-top: 0;"><i class="fas fa-user-plus"></i> Crear Nuevo Usuario</h3>
+                    <form id="newUserForm" class="form-grid">
+                        <div class="form-group">
+                            <label for="nu_username">Usuario:</label>
+                            <input type="text" id="nu_username" required placeholder="Nombre de usuario único">
+                        </div>
+                        <div class="form-group">
+                            <label for="nu_password">Contraseña:</label>
+                            <input type="password" id="nu_password" required placeholder="Contraseña segura">
+                        </div>
+                        <div class="form-group">
+                            <label for="nu_rol">Rol:</label>
+                            <select id="nu_rol" required>
+                                <option value="Vendedor">Vendedor</option>
+                                <option value="Bodeguero">Bodeguero</option>
+                                <option value="Admin">Administrador</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn primary-btn full-width">
+                            <i class="fas fa-user-plus"></i> Crear Usuario
+                        </button>
+                    </form>
+                    <div id="statusNewUser" class="status-message"></div>
+                </div>
+
+                <!-- Tabla de Usuarios Existentes -->
+                <div
+                    style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;"><i class="fas fa-list"></i> Usuarios Registrados</h3>
+                        <button id="refreshUsersBtn" class="btn secondary-btn">
+                            <i class="fas fa-sync"></i> Refrescar
+                        </button>
+                    </div>
+                    <table class="data-table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Rol</th>
+                                <th>Fecha Creación</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="4">Cargando...</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
@@ -297,15 +551,12 @@
                     <button id="iniciarDBBtn" class="btn primary-btn">
                         <i class="fas fa-play-circle"></i> Iniciar Base de Datos
                     </button>
-                    
+
                     <p class="warning-text" style="color: var(--danger-color); font-weight: bold; margin-top: 20px;">
                         ¡ADVERTENCIA! Esta acción eliminará **TODOS** los datos.
                     </p>
                     <button id="resetDBBtn" class="btn danger-btn">
                         <i class="fas fa-sync-alt"></i> Resetear Base de Datos
-                    </button>
-                    <button id="createUserBtn" class="btn secondary-btn" style="margin-left:10px">
-                        <i class="fas fa-user-plus"></i> Crear Usuario
                     </button>
                 </div>
                 <div id="statusConfig" class="status-message"></div>
@@ -315,12 +566,12 @@
 
     <script>
         // Mostrar usuario actual y manejar logout sin modificar lógica existente
-        document.addEventListener('DOMContentLoaded', ()=>{
-            try{
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
                 const label = document.getElementById('currentUserLabel');
                 const logoutBtn = document.getElementById('logoutBtn');
 
-                function refresh(){
+                function refresh() {
                     const u = window.InvAuth && typeof window.InvAuth.currentUser === 'function' ? window.InvAuth.currentUser() : null;
                     label.textContent = u ? ('Usuario: ' + u) : 'Usuario: —';
                     logoutBtn.style.display = u ? 'inline-flex' : 'none';
@@ -328,21 +579,28 @@
 
                 refresh();
 
-                logoutBtn.addEventListener('click', ()=>{
-                    if(confirm('¿Cerrar sesión?')){
-                        try{ window.InvAuth && window.InvAuth.logout && window.InvAuth.logout(); }catch(e){}
+                logoutBtn.addEventListener('click', () => {
+                    if (confirm('¿Cerrar sesión?')) {
+                        try { window.InvAuth && window.InvAuth.logout && window.InvAuth.logout(); } catch (e) { }
                         location.href = 'login.html';
                     }
                 });
 
                 // Por si `InvAuth` se inicializa después
                 setTimeout(refresh, 300);
-            }catch(e){/* no bloquear */}
+            } catch (e) {/* no bloquear */ }
         });
     </script>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="script.js"></script>
+    <script src="user_management.js"></script>
 
-    
+    <!-- Contenedor de Toasts -->
+    <div id="toast-container"
+        style="position:fixed; bottom:20px; right:20px; z-index:10000; display:flex; flex-direction:column; gap:10px;">
+    </div>
+
 </body>
+
 </html>
