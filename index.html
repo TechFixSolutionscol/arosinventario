@@ -1,15 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FixOps</title>
-    <!-- Iconos de Font Awesome -->
+    <meta name="description" content="FixOps — Sistema de Gestión de Inventario y Pedidos">
+    <title>FixOps — Inventario</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <!-- Librería de Gráficos (Chart.js) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="estilo.css">
+    <script src="config.js"></script>
     <script src="auth.js"></script>
 </head>
 
@@ -34,49 +38,96 @@
     </script>
 
     <div class="dashboard-container">
-        <div id="authBox"
-            style="position:fixed;top:12px;right:12px;background:var(--card-bg,#fff);padding:8px 12px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;display:flex;gap:8px;align-items:center">
-            <span id="currentUserLabel" style="font-weight:600;color:var(--primary-color)">Usuario: —</span>
-            <button id="logoutBtn" class="btn secondary-btn" style="padding:6px 10px;">Cerrar sesión</button>
-        </div>
-        <!-- Barra Lateral -->
-        <aside class="sidebar">
-            <div class="logo">
-                <img src="assets/img/logo.png" alt="Logo" class="logo" width="200">
+
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar" id="mainSidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle" id="sidebarToggleBtn" title="Colapsar/Expandir menú">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <img src="assets/img/logo.png" alt="Logo FixOps">
+                    <span class="logo-text">FixOps</span>
+                </div>
             </div>
+
             <nav class="sidebar-nav">
-                <a href="#dashboard" class="active" data-section="dashboard">
-                    <i class="fas fa-chart-line"></i> Dashboard
+                <div class="nav-group-label">Principal</div>
+                <a href="#dashboard" class="active" data-section="dashboard" data-tooltip="Dashboard">
+                    <i class="fas fa-chart-line nav-icon"></i>
+                    <span class="nav-label">Dashboard</span>
                 </a>
-                <a href="#inventario" data-section="inventario">
-                    <i class="fas fa-cubes"></i> Inventario Actual
+                <a href="#inventario" data-section="inventario" data-tooltip="Inventario">
+                    <i class="fas fa-cubes nav-icon"></i>
+                    <span class="nav-label">Inventario</span>
                 </a>
-                <a href="#productos" data-section="productos">
-                    <i class="fas fa-box-open"></i> Registrar Producto
+                <a href="#productos" data-section="productos" data-tooltip="Registrar Producto">
+                    <i class="fas fa-box-open nav-icon"></i>
+                    <span class="nav-label">Registrar Producto</span>
                 </a>
-                <a href="#categorias" data-section="categorias">
-                    <i class="fas fa-tags"></i> Categorías
+                <a href="#categorias" data-section="categorias" data-tooltip="Categorías">
+                    <i class="fas fa-tags nav-icon"></i>
+                    <span class="nav-label">Categorías</span>
                 </a>
-                <a href="#compras" data-section="compras">
-                    <i class="fas fa-truck-loading"></i> Compras
+
+                <div class="nav-group-label">Operaciones</div>
+                <a href="#compras" data-section="compras" data-tooltip="Compras">
+                    <i class="fas fa-truck-loading nav-icon"></i>
+                    <span class="nav-label">Compras</span>
                 </a>
-                <a href="#ventas" data-section="ventas">
-                    <i class="fas fa-cash-register"></i> Ventas
+                <a href="#ventas" data-section="ventas" data-tooltip="Ventas">
+                    <i class="fas fa-cash-register nav-icon"></i>
+                    <span class="nav-label">Ventas</span>
                 </a>
-                <a href="#resumenes" data-section="resumenes">
-                    <i class="fas fa-list-alt"></i> Resúmenes
+                <a href="#pedidos" data-section="pedidos" data-tooltip="Historial Pedidos">
+                    <i class="fas fa-file-invoice nav-icon"></i>
+                    <span class="nav-label">Historial Pedidos</span>
                 </a>
-                <a href="#contactos" data-section="contactos">
-                    <i class="fas fa-address-book"></i> Contactos
+                <a href="#resumenes" data-section="resumenes" data-tooltip="Resúmenes">
+                    <i class="fas fa-list-alt nav-icon"></i>
+                    <span class="nav-label">Resúmenes</span>
                 </a>
-                <a href="#usuarios" data-section="usuarios">
-                    <i class="fas fa-users"></i> Usuarios
+
+                <div class="nav-group-label">Administración</div>
+                <a href="#contactos" data-section="contactos" data-tooltip="Contactos">
+                    <i class="fas fa-address-book nav-icon"></i>
+                    <span class="nav-label">Contactos</span>
                 </a>
-                <a href="#configuracion" data-section="configuracion">
-                    <i class="fas fa-cog"></i> Configuración
+                <a href="#usuarios" data-section="usuarios" data-tooltip="Usuarios">
+                    <i class="fas fa-users nav-icon"></i>
+                    <span class="nav-label">Usuarios</span>
+                </a>
+                <a href="#configuracion" data-section="configuracion" data-tooltip="Configuración">
+                    <i class="fas fa-cog nav-icon"></i>
+                    <span class="nav-label">Configuración</span>
                 </a>
             </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn">
+                    <i class="fas fa-sign-out-alt" style="width:20px;text-align:center;"></i>
+                    <span class="btn-label">Cerrar sesión</span>
+                </button>
+            </div>
         </aside>
+
+        <!-- ===== TOPBAR ===== -->
+        <header class="topbar" id="mainTopbar">
+            <div class="breadcrumb">
+                <i class="fas fa-home" style="font-size:0.8rem;"></i>
+                <span class="bc-sep">›</span>
+                <span class="bc-current" id="breadcrumbCurrent">Dashboard</span>
+            </div>
+            <div class="topbar-actions">
+                <button class="dark-toggle" id="darkModeBtn" title="Cambiar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="user-chip">
+                    <div class="user-avatar" id="userAvatarInitials">?</div>
+                    <span id="currentUserLabel">Usuario</span>
+                </div>
+            </div>
+        </header>
 
         <!-- Contenido Principal -->
         <main class="main-content">
@@ -85,39 +136,68 @@
             <section id="dashboard" class="content-section active">
                 <h2><i class="fas fa-chart-line"></i> Dashboard - Resumen Financiero</h2>
 
-                <!-- Botones de control -->
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <!-- Filtros y Botones -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Desde:</label>
+                        <input type="date" id="dash_fecha_inicio" class="form-control"
+                            style="padding: 8px; border-radius: 8px; border: 1px solid #ddd;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Hasta:</label>
+                        <input type="date" id="dash_fecha_fin" class="form-control"
+                            style="padding: 8px; border-radius: 8px; border: 1px solid #ddd;">
+                    </div>
                     <button id="cargarDatosGraficosBtn" class="btn primary-btn">
                         <i class="fas fa-sync"></i> Actualizar Dashboard
                     </button>
-                    <button id="calcularResumenBtn" class="btn secondary-btn">
-                        <i class="fas fa-calculator"></i> Calcular Resumen
-                    </button>
+                    <!-- Eliminado el botón duplicado 'calcularResumenBtn' ya que la vista lo maneja completo ahora -->
                 </div>
 
                 <div id="statusDashboard" class="status-message"></div>
 
-                <!-- Estadísticas Resumen -->
+                <!-- Estadísticas Resumen (KPIs principales) -->
                 <div class="stats-grid">
                     <div class="stat-card ventas">
                         <i class="fas fa-shopping-cart fa-2x" style="color: var(--primary-color);"></i>
                         <div class="stat-value" id="totalVentas">$0.00</div>
-                        <div class="stat-label">Total Ventas</div>
+                        <div class="stat-label">Total Ventas (Base)</div>
                     </div>
                     <div class="stat-card compras">
                         <i class="fas fa-truck-loading fa-2x" style="color: var(--info-color);"></i>
                         <div class="stat-value" id="totalCompras">$0.00</div>
-                        <div class="stat-label">Total Compras</div>
+                        <div class="stat-label">Total Compras (Base)</div>
                     </div>
                     <div class="stat-card ganancias">
                         <i class="fas fa-chart-line fa-2x" style="color: var(--secondary-color);"></i>
                         <div class="stat-value" id="totalGanancias">$0.00</div>
-                        <div class="stat-label">Ganancias Netas</div>
+                        <div class="stat-label">Ganancia Bruta</div>
                     </div>
-                    <div class="stat-card gastos">
-                        <i class="fas fa-money-bill-wave fa-2x" style="color: var(--danger-color);"></i>
-                        <div class="stat-value" id="totalGastos">$0.00</div>
-                        <div class="stat-label">Total Gastos</div>
+                    <!-- Nuevos KPIs -->
+                    <div class="stat-card" style="border-left: 4px solid #8e44ad;">
+                        <i class="fas fa-receipt fa-2x" style="color: #8e44ad;"></i>
+                        <div class="stat-value" id="kpiTransacciones">0</div>
+                        <div class="stat-label">Transacciones (Vtas)</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #e67e22;">
+                        <i class="fas fa-ticket-alt fa-2x" style="color: #e67e22;"></i>
+                        <div class="stat-value" id="kpiTicketPromedio">$0.00</div>
+                        <div class="stat-label">Ticket Promedio</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #34495e;">
+                        <i class="fas fa-box fa-2x" style="color: #34495e;"></i>
+                        <div class="stat-value" id="kpiTotalIva">$0.00</div>
+                        <div class="stat-label">IVA Recaudado</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Gráficas (Bar y Line) -->
+                    <div class="chart-container" style="margin-top:0;">
+                        <canvas id="resumenFinancieroChart"></canvas>
+                    </div>
+                    <div class="chart-container" style="margin-top:0;">
+                        <canvas id="tendenciasChart"></canvas>
                     </div>
                 </div>
 
@@ -164,11 +244,12 @@
                                 <th>Tipo</th>
                                 <th>Stock</th>
                                 <th>P. Venta</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="inventarioTableBody">
                             <tr>
-                                <td colspan="6">Presiona "Refrescar Inventario" para cargar los datos.</td>
+                                <td colspan="8">Presiona "Refrescar Inventario" para cargar los datos.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -213,7 +294,7 @@
                     </div>
                     <div class="form-group" id="p_stock_group">
                         <label for="p_stock">Stock Inicial:</label>
-                        <input type="number" id="p_stock" required min="0" required ="1">
+                        <input type="number" id="p_stock" required min="0" value="1">
                     </div>
 
                     <button type="submit" class="btn primary-btn full-width">
@@ -227,21 +308,38 @@
             <!-- Sección 3: Categorías -->
             <section id="categorias" class="content-section">
                 <h2><i class="fas fa-tags"></i> Gestión de Categorías</h2>
-                <form id="categoriaForm" class="form-grid single-col">
-                    <div class="form-group">
-                        <label for="c_nombre">Nombre de la Categoría:</label>
-                        <input type="text" id="c_nombre" required placeholder="Ej: Electrónica, Ropa, etc.">
-                    </div>
-                    <button type="submit" class="btn secondary-btn">
-                        <i class="fas fa-plus"></i> Agregar Categoría
-                    </button>
-                </form>
-                <div id="statusCategoria" class="status-message"></div>
+                <div
+                    style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <form id="categoriaForm" class="form-grid single-col">
+                        <div class="form-group">
+                            <label for="c_nombre">Nombre de la Categoría:</label>
+                            <input type="text" id="c_nombre" required placeholder="Ej: Electrónica, Ropa, etc.">
+                        </div>
+                        <button type="submit" class="btn secondary-btn">
+                            <i class="fas fa-plus"></i> Agregar Categoría
+                        </button>
+                    </form>
+                    <div id="statusCategoria" class="status-message"></div>
+                </div>
 
-                <h3>Categorías Existentes:</h3>
-                <ul id="listaCategorias">
-                    <li>Cargando...</li>
-                </ul>
+                <div
+                    style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin-top:0;"><i class="fas fa-list"></i> Categorías Existentes</h3>
+                    <table class="data-table" id="categoriasTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoriasTableBody">
+                            <tr>
+                                <td colspan="3">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <!-- Sección: Contactos (Proveedores/Clientes) -->
@@ -255,12 +353,33 @@
                         <h3><i class="fas fa-truck"></i> Nuevo Proveedor</h3>
                         <form id="proveedorForm" class="form-grid single-col">
                             <div class="form-group">
+                                <label>Tipo de Contacto:</label>
+                                <div style="display:flex; gap:15px; margin-top:5px;">
+                                    <label style="font-weight:normal; cursor:pointer;"><input type="radio"
+                                            name="c_tipo_pr" value="Empresa" checked> Empresa</label>
+                                    <label style="font-weight:normal; cursor:pointer;"><input type="radio"
+                                            name="c_tipo_pr" value="Persona"> Persona</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="c_identificacion_pr">NIT / C.C.:</label>
+                                <input type="text" id="c_identificacion_pr" placeholder="Ej. 900123456-7">
+                            </div>
+                            <div class="form-group">
                                 <label for="c_nombre_pr">Nombre del Proveedor:</label>
                                 <input type="text" id="c_nombre_pr" required>
                             </div>
                             <div class="form-group">
+                                <label for="c_email_pr">Correo Electrónico:</label>
+                                <input type="email" id="c_email_pr" placeholder="contacto@empresa.com">
+                            </div>
+                            <div class="form-group">
                                 <label for="c_telefono_pr">Teléfono:</label>
                                 <input type="text" id="c_telefono_pr">
+                            </div>
+                            <div class="form-group">
+                                <label for="c_direccion_pr">Dirección:</label>
+                                <input type="text" id="c_direccion_pr" placeholder="Ciudad, Dirección...">
                             </div>
                             <button type="submit" class="btn secondary-btn full-width">Guardar Proveedor</button>
                         </form>
@@ -272,12 +391,33 @@
                         <h3><i class="fas fa-user-friends"></i> Nuevo Cliente</h3>
                         <form id="clienteForm" class="form-grid single-col">
                             <div class="form-group">
+                                <label>Tipo de Contacto:</label>
+                                <div style="display:flex; gap:15px; margin-top:5px;">
+                                    <label style="font-weight:normal; cursor:pointer;"><input type="radio"
+                                            name="c_tipo_cl" value="Persona" checked> Persona</label>
+                                    <label style="font-weight:normal; cursor:pointer;"><input type="radio"
+                                            name="c_tipo_cl" value="Empresa"> Empresa</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="c_identificacion_cl">NIT / C.C.:</label>
+                                <input type="text" id="c_identificacion_cl" placeholder="Ej. 1000234567">
+                            </div>
+                            <div class="form-group">
                                 <label for="c_nombre_cl">Nombre del Cliente:</label>
                                 <input type="text" id="c_nombre_cl" required>
                             </div>
                             <div class="form-group">
+                                <label for="c_email_cl">Correo Electrónico:</label>
+                                <input type="email" id="c_email_cl" placeholder="cliente@correo.com">
+                            </div>
+                            <div class="form-group">
                                 <label for="c_telefono_cl">Teléfono:</label>
                                 <input type="text" id="c_telefono_cl">
+                            </div>
+                            <div class="form-group">
+                                <label for="c_direccion_cl">Dirección:</label>
+                                <input type="text" id="c_direccion_cl" placeholder="Ciudad, Dirección...">
                             </div>
                             <button type="submit" class="btn secondary-btn full-width">Guardar Cliente</button>
                         </form>
@@ -285,167 +425,182 @@
                 </div>
                 <div id="statusContactos" class="status-message"></div>
 
-                <div style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-                    <div>
-                        <h4>Lista de Proveedores</h4>
-                        <ul id="listaProveedores" class="category-list">
-                            <li>Cargando...</li>
-                        </ul>
+                <div style="margin-top:20px;">
+                    <h3 style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #ddd;"><i
+                            class="fas fa-truck"></i> Proveedores</h3>
+                    <div id="tablaProveedores" class="kanban-grid">
+                        <div style="padding:20px; color:#666;">Cargando proveedores...</div>
                     </div>
-                    <div>
-                        <h4>Lista de Clientes</h4>
-                        <ul id="listaClientes" class="category-list">
-                            <li>Cargando...</li>
-                        </ul>
+                </div>
+
+                <div style="margin-top:30px;">
+                    <h3 style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #ddd;"><i
+                            class="fas fa-user-friends"></i> Clientes</h3>
+                    <div id="tablaClientes" class="kanban-grid">
+                        <div style="padding:20px; color:#666;">Cargando clientes...</div>
                     </div>
                 </div>
             </section>
 
-            <!-- Sección 4: Compras (Pedido Multi-producto) -->
+            <!-- Sección 4: Compras (Lista estilo Odoo) -->
             <section id="compras" class="content-section">
-                <div
-                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                    <div>
-                        <h2 style="margin:0;"><i class="fas fa-truck-loading"></i> Pedido de Compra</h2>
-                        <span id="co_order_id" style="font-size: 1.5rem; font-weight: 800; color: #666;">P-00000</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <button type="button" class="btn primary-btn" id="co_submit_btn">
-                            <i class="fas fa-save"></i> Confirmar Compra
-                        </button>
-                    </div>
-                </div>
-
-                <div class="order-header">
-                    <div class="form-group">
-                        <label>Proveedor:</label>
-                        <select id="co_proveedor" placeholder="Escriba o elija proveedor">
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Fecha de Recepción:</label>
-                        <input type="date" id="co_fecha">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 25px;">
-                        <input type="checkbox" id="co_apply_iva" checked style="width: 20px; height: 20px;">
-                        <label for="co_apply_iva" style="margin:0; cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
-                    </div>
-                </div>
-
-                <div style="overflow-x: auto;">
-                    <table class="order-table" id="co_items_table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40%;">Producto</th>
-                                <th>Cantidad</th>
-                                <th>Precio Unit.</th>
-                                <th>Subtotal</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="co_items_body">
-                            <!-- Líneas dinámicas -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="line-actions">
-                    <button type="button" class="btn secondary-btn" id="co_add_line">
-                        <i class="fas fa-plus"></i> Agregar un producto
+                <div class="odoo-list-header">
+                    <h2 style="margin:0;"><i class="fas fa-truck-loading"></i> Órdenes de Compra</h2>
+                    <button class="btn primary-btn" id="nuevaCompraBtn" onclick="openNewOrderModal('compra')">
+                        <i class="fas fa-plus"></i> Crear
                     </button>
                 </div>
 
-                <div class="totals-section">
-                    <div class="total-row">
-                        <span>Base Imponible:</span>
-                        <span id="co_base_imponible">$0</span>
-                    </div>
-                    <div class="total-row">
-                        <span>IVA (19%):</span>
-                        <span id="co_iva">$0</span>
-                    </div>
-                    <div class="total-row grand-total">
-                        <span>Total:</span>
-                        <span id="co_total">$0</span>
-                    </div>
+                <!-- Pipeline de estados (filtro visual) -->
+                <div class="odoo-pipeline-filter" id="co_pipeline_filter">
+                    <button class="pipeline-filter-btn active" data-filter="" data-prefix="co">Todos</button>
+                    <button class="pipeline-filter-btn" data-filter="borrador" data-prefix="co">Borrador</button>
+                    <button class="pipeline-filter-btn" data-filter="confirmado" data-prefix="co">Confirmado</button>
+                    <button class="pipeline-filter-btn" data-filter="completado" data-prefix="co">Completado</button>
+                    <button class="pipeline-filter-btn" data-filter="cancelado" data-prefix="co">Cancelado</button>
                 </div>
-                <div style="clear: both;"></div>
-                <div id="statusCompra" class="status-message"></div>
+
+                <!-- Barra de búsqueda -->
+                <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;">
+                    <div
+                        style="flex:1; display:flex; align-items:center; background:white; padding:0 15px; border-radius:10px; border:1px solid #ddd;">
+                        <i class="fas fa-search" style="color:#aaa;"></i>
+                        <input type="text" id="searchCompras" placeholder="Buscar por referencia, proveedor..."
+                            style="border:none; padding:10px; outline:none; width:100%;" autocomplete="off">
+                    </div>
+                    <button class="btn secondary-btn" onclick="loadOrdersByType('compra')"><i class="fas fa-sync"></i>
+                        Refrescar</button>
+                </div>
+
+                <div id="statusCompraLista" class="status-message"></div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table odoo-orders-table" id="comprasTable">
+                        <thead>
+                            <tr>
+                                <th>Referencia</th>
+                                <th>Proveedor</th>
+                                <th>Fecha</th>
+                                <th>Método Pago</th>
+                                <th style="text-align:right;">Total</th>
+                                <th style="text-align:center;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comprasTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align:center; padding:30px; color:#aaa;"><i
+                                        class="fas fa-inbox fa-2x"></i><br>Cargando órdenes...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
-            <!-- Sección 5: Ventas (Pedido Multi-producto) -->
+            <!-- Sección 5: Ventas (Lista estilo Odoo) -->
             <section id="ventas" class="content-section">
-                <div
-                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                    <div>
-                        <h2 style="margin:0;"><i class="fas fa-cash-register"></i> Pedido de Venta</h2>
-                        <span id="v_order_id" style="font-size: 1.5rem; font-weight: 800; color: #666;">V-00000</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <button type="button" class="btn primary-btn" id="v_submit_btn">
-                            <i class="fas fa-check-circle"></i> Confirmar Venta
-                        </button>
-                    </div>
-                </div>
-
-                <div class="order-header">
-                    <div class="form-group">
-                        <label>Cliente:</label>
-                        <select id="v_cliente" placeholder="Escriba o elija cliente">
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Fecha de Venta:</label>
-                        <input type="date" id="v_fecha">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 25px;">
-                        <input type="checkbox" id="v_apply_iva" checked style="width: 20px; height: 20px;">
-                        <label for="v_apply_iva" style="margin:0; cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
-                    </div>
-                </div>
-
-                <div style="overflow-x: auto;">
-                    <table class="order-table" id="v_items_table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40%;">Producto</th>
-                                <th>Cantidad</th>
-                                <th>Precio Unit.</th>
-                                <th>Subtotal</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="v_items_body">
-                            <!-- Líneas dinámicas se insertan aquí -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="line-actions">
-                    <button type="button" class="btn secondary-btn" id="v_add_line">
-                        <i class="fas fa-plus"></i> Agregar un producto
+                <div class="odoo-list-header">
+                    <h2 style="margin:0;"><i class="fas fa-cash-register"></i> Órdenes de Venta</h2>
+                    <button class="btn primary-btn" id="nuevaVentaBtn" onclick="openNewOrderModal('venta')">
+                        <i class="fas fa-plus"></i> Crear
                     </button>
                 </div>
 
-                <div class="totals-section">
-                    <div class="total-row">
-                        <span>Base Imponible:</span>
-                        <span id="v_base_imponible">$0</span>
+                <!-- Pipeline de estados -->
+                <div class="odoo-pipeline-filter" id="v_pipeline_filter">
+                    <button class="pipeline-filter-btn active" data-filter="" data-prefix="v">Todos</button>
+                    <button class="pipeline-filter-btn" data-filter="borrador" data-prefix="v">Borrador</button>
+                    <button class="pipeline-filter-btn" data-filter="confirmado" data-prefix="v">Confirmado</button>
+                    <button class="pipeline-filter-btn" data-filter="completado" data-prefix="v">Completado</button>
+                    <button class="pipeline-filter-btn" data-filter="cancelado" data-prefix="v">Cancelado</button>
+                </div>
+
+                <!-- Barra de búsqueda -->
+                <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;">
+                    <div
+                        style="flex:1; display:flex; align-items:center; background:white; padding:0 15px; border-radius:10px; border:1px solid #ddd;">
+                        <i class="fas fa-search" style="color:#aaa;"></i>
+                        <input type="text" id="searchVentas" placeholder="Buscar por referencia, cliente..."
+                            style="border:none; padding:10px; outline:none; width:100%;" autocomplete="off">
                     </div>
-                    <div class="total-row">
-                        <span>IVA (19%):</span>
-                        <span id="v_iva">$0</span>
-                    </div>
-                    <div class="total-row grand-total">
-                        <span>Total:</span>
-                        <span id="v_total">$0</span>
+                    <button class="btn secondary-btn" onclick="loadOrdersByType('venta')"><i class="fas fa-sync"></i>
+                        Refrescar</button>
+                </div>
+
+                <div id="statusVentaLista" class="status-message"></div>
+
+                <div style="overflow-x:auto;">
+                    <table class="data-table odoo-orders-table" id="ventasTable">
+                        <thead>
+                            <tr>
+                                <th>Referencia</th>
+                                <th>Cliente</th>
+                                <th>Fecha</th>
+                                <th>Método Pago</th>
+                                <th style="text-align:right;">Total</th>
+                                <th style="text-align:center;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventasTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align:center; padding:30px; color:#aaa;"><i
+                                        class="fas fa-inbox fa-2x"></i><br>Cargando órdenes...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sección: Historial de Pedidos (combinado) -->
+            <section id="pedidos" class="content-section">
+                <div class="odoo-list-header">
+                    <h2 style="margin:0;"><i class="fas fa-file-invoice"></i> Historial de Pedidos</h2>
+                    <button id="cargarPedidosBtn" class="btn secondary-btn"><i class="fas fa-sync"></i>
+                        Refrescar</button>
+                </div>
+                <div style="display:flex; gap:10px; margin:15px 0; align-items:center; flex-wrap:wrap;">
+                    <select id="filtroTipoPedido" style="padding:8px 12px; border-radius:8px; border:1px solid #ddd;">
+                        <option value="">Tipo (Todos)</option>
+                        <option value="compra">Compras</option>
+                        <option value="venta">Ventas</option>
+                    </select>
+                    <select id="filtroEstadoPedido" style="padding:8px 12px; border-radius:8px; border:1px solid #ddd;">
+                        <option value="">Estado (Todos)</option>
+                        <option value="borrador">Borrador</option>
+                        <option value="confirmado">Confirmado</option>
+                        <option value="completado">Completado</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                    <div
+                        style="flex:1; display:flex; align-items:center; background:white; padding:0 15px; border-radius:10px; border:1px solid #ddd; min-width:200px;">
+                        <i class="fas fa-search" style="color:#aaa;"></i>
+                        <input type="text" id="searchPedidos" placeholder="Buscar pedidos..."
+                            style="border:none; padding:10px; outline:none; width:100%;" autocomplete="off">
                     </div>
                 </div>
-                <div style="clear: both;"></div>
-                <div id="statusVenta" class="status-message"></div>
+                <div id="statusPedidos" class="status-message"></div>
+                <div style="overflow-x:auto;">
+                    <table class="data-table odoo-orders-table" id="pedidosTable">
+                        <thead>
+                            <tr>
+                                <th>Referencia</th>
+                                <th>Tipo</th>
+                                <th>Fecha</th>
+                                <th>Contacto</th>
+                                <th style="text-align:right;">Total</th>
+                                <th style="text-align:center;">Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pedidosTableBody">
+                            <tr>
+                                <td colspan="7">Cargando pedidos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
+
+
 
             <!-- Sección 6: Resúmenes -->
             <section id="resumenes" class="content-section">
@@ -487,18 +642,26 @@
             <section id="usuarios" class="content-section">
                 <h2><i class="fas fa-users"></i> Gestión de Usuarios</h2>
 
-                <!-- Formulario de Nuevo Usuario -->
                 <div
                     style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                     <h3 style="margin-top: 0;"><i class="fas fa-user-plus"></i> Crear Nuevo Usuario</h3>
                     <form id="newUserForm" class="form-grid">
                         <div class="form-group">
                             <label for="nu_username">Usuario:</label>
-                            <input type="text" id="nu_username" required placeholder="Nombre de usuario único">
+                            <input type="text" id="nu_username" required placeholder="Nombre de usuario único"
+                                minlength="3">
                         </div>
                         <div class="form-group">
                             <label for="nu_password">Contraseña:</label>
-                            <input type="password" id="nu_password" required placeholder="Contraseña segura">
+                            <input type="password" id="nu_password" required placeholder="Mín 6 caracteres, 1 número"
+                                minlength="6">
+                            <div id="nu_password_strength"
+                                style="height:4px; border-radius:2px; margin-top:4px; transition: all 0.3s;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="nu_password2">Confirmar Contraseña:</label>
+                            <input type="password" id="nu_password2" required placeholder="Repita la contraseña"
+                                minlength="6">
                         </div>
                         <div class="form-group">
                             <label for="nu_rol">Rol:</label>
@@ -508,6 +671,10 @@
                                 <option value="Admin">Administrador</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="nu_adminkey">Clave Admin:</label>
+                            <input type="password" id="nu_adminkey" required placeholder="Clave de administrador">
+                        </div>
                         <button type="submit" class="btn primary-btn full-width">
                             <i class="fas fa-user-plus"></i> Crear Usuario
                         </button>
@@ -515,7 +682,6 @@
                     <div id="statusNewUser" class="status-message"></div>
                 </div>
 
-                <!-- Tabla de Usuarios Existentes -->
                 <div
                     style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                     <div
@@ -564,6 +730,437 @@
         </main>
     </div>
 
+    <!-- ===== ESTILOS DE MODALES ===== -->
+    <style>
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-box {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #999;
+            padding: 0 4px;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 14px;
+        }
+
+        .modal-body .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .modal-body .form-group input,
+        .modal-body .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 14px 20px;
+            border-top: 1px solid #eee;
+            background: #fafafa;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .btn-icon {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: #f0f0f0;
+            border-color: #bbb;
+        }
+
+        .btn-icon.danger {
+            color: var(--danger-color);
+        }
+
+        .btn-icon.danger:hover {
+            background: #fff0f0;
+        }
+
+        /* ===== ESTILOS KANBAN ODOO ===== */
+        .kanban-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .kanban-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s, transform 0.2s;
+            position: relative;
+        }
+
+        .kanban-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .kanban-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            flex-shrink: 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .kanban-details {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .kanban-details strong {
+            display: block;
+            font-size: 1.05rem;
+            color: #333;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .kanban-details .k-info {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .kanban-details .k-info i {
+            color: #999;
+            width: 14px;
+            text-align: center;
+        }
+
+        .kanban-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .kanban-card:hover .kanban-actions {
+            opacity: 1;
+        }
+    </style>
+
+    <!-- ===== MODAL: Editar Rol ===== -->
+    <div id="modalEditRole" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Cambiar Rol</h3>
+                <button class="modal-close" onclick="closeModal('modalEditRole')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Cambiar rol de: <strong id="modal_role_user"></strong></p>
+                <div class="form-group">
+                    <label>Nuevo Rol:</label>
+                    <select id="modal_role_select">
+                        <option value="Vendedor">Vendedor</option>
+                        <option value="Bodeguero">Bodeguero</option>
+                        <option value="Admin">Administrador</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Clave Admin:</label>
+                    <input type="password" id="modal_role_adminkey" placeholder="Ingrese clave admin">
+                </div>
+                <div id="modal_role_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalEditRole')">Cancelar</button>
+                <button class="btn primary-btn" id="modal_role_save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Cambiar/Resetear Contraseña ===== -->
+    <div id="modalPassword" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fas fa-key"></i> <span id="modal_pw_title">Cambiar Contraseña</span></h3>
+                <button class="modal-close" onclick="closeModal('modalPassword')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Usuario: <strong id="modal_pw_user"></strong></p>
+                <div class="form-group" id="modal_pw_current_group">
+                    <label>Contraseña Actual:</label>
+                    <input type="password" id="modal_pw_current" placeholder="Su contraseña actual">
+                </div>
+                <div class="form-group" id="modal_pw_adminkey_group" style="display:none;">
+                    <label>Clave Admin:</label>
+                    <input type="password" id="modal_pw_adminkey" placeholder="Clave de administrador">
+                </div>
+                <div class="form-group">
+                    <label>Nueva Contraseña:</label>
+                    <input type="password" id="modal_pw_new" placeholder="Mín 6 caracteres, 1 número" minlength="6">
+                    <div id="modal_pw_strength"
+                        style="height:4px; border-radius:2px; margin-top:4px; transition: all 0.3s;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Confirmar Nueva Contraseña:</label>
+                    <input type="password" id="modal_pw_confirm" placeholder="Repita la nueva contraseña">
+                </div>
+                <div id="modal_pw_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalPassword')">Cancelar</button>
+                <button class="btn primary-btn" id="modal_pw_save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Confirmar Eliminación ===== -->
+    <div id="modalDeleteUser" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 style="color: var(--danger-color);"><i class="fas fa-exclamation-triangle"></i> Eliminar Usuario
+                </h3>
+                <button class="modal-close" onclick="closeModal('modalDeleteUser')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de eliminar al usuario <strong id="modal_del_user"></strong>?</p>
+                <p style="color: var(--danger-color); font-size: 0.9em;"><i class="fas fa-exclamation-circle"></i> Esta
+                    acción no se puede deshacer.</p>
+                <div class="form-group">
+                    <label>Clave Admin para confirmar:</label>
+                    <input type="password" id="modal_del_adminkey" placeholder="Ingrese clave admin">
+                </div>
+                <div id="modal_del_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalDeleteUser')">Cancelar</button>
+                <button class="btn danger-btn" id="modal_del_confirm">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Editar Categoría ===== -->
+    <div id="modalEditCategory" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Categoría</h3>
+                <button class="modal-close" onclick="closeModal('modalEditCategory')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal_cat_id">
+                <div class="form-group">
+                    <label>Nombre de la Categoría:</label>
+                    <input type="text" id="modal_cat_nombre" placeholder="Nuevo nombre">
+                </div>
+                <div id="modal_cat_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalEditCategory')">Cancelar</button>
+                <button class="btn primary-btn" id="modal_cat_save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Editar Producto ===== -->
+    <div id="modalEditProduct" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width:540px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-box"></i> Editar Producto</h3>
+                <button class="modal-close" onclick="closeModal('modalEditProduct')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal_prod_id">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="modal_prod_nombre">
+                    </div>
+                    <div class="form-group">
+                        <label>Código:</label>
+                        <input type="text" id="modal_prod_codigo">
+                    </div>
+                    <div class="form-group">
+                        <label>Categoría:</label>
+                        <select id="modal_prod_categoria"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo:</label>
+                        <select id="modal_prod_tipo">
+                            <option value="Inventariable">Inventariable</option>
+                            <option value="Servicio">Servicio</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio Compra:</label>
+                        <input type="number" id="modal_prod_pcompra" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Precio Venta:</label>
+                        <input type="number" id="modal_prod_pventa" step="0.01" min="0">
+                    </div>
+                    <div class="form-group" id="modal_prod_stock_group">
+                        <label>Stock:</label>
+                        <input type="number" id="modal_prod_stock" min="0">
+                    </div>
+                </div>
+                <div id="modal_prod_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalEditProduct')">Cancelar</button>
+                <button class="btn primary-btn" id="modal_prod_save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Editar Contacto ===== -->
+    <div id="modalEditContact" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fas fa-address-card"></i> <span id="modal_contact_title">Editar Contacto</span></h3>
+                <button class="modal-close" onclick="closeModal('modalEditContact')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal_contact_id">
+                <input type="hidden" id="modal_contact_sheet">
+
+                <div class="form-group">
+                    <label>Tipo de Contacto:</label>
+                    <div style="display:flex; gap:15px; margin-top:5px;">
+                        <label style="font-weight:normal; cursor:pointer;"><input type="radio" name="modal_contact_tipo"
+                                value="Persona"> Persona</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="radio" name="modal_contact_tipo"
+                                value="Empresa"> Empresa</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>NIT / C.C.:</label>
+                    <input type="text" id="modal_contact_identificacion">
+                </div>
+                <div class="form-group">
+                    <label>Nombre:</label>
+                    <input type="text" id="modal_contact_nombre">
+                </div>
+                <div class="form-group">
+                    <label>Correo Electrónico:</label>
+                    <input type="email" id="modal_contact_email">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono:</label>
+                    <input type="text" id="modal_contact_telefono">
+                </div>
+                <div class="form-group">
+                    <label>Dirección:</label>
+                    <input type="text" id="modal_contact_direccion">
+                </div>
+                <div id="modal_contact_status" class="status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary-btn" onclick="closeModal('modalEditContact')">Cancelar</button>
+                <button class="btn primary-btn" id="modal_contact_save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Mostrar usuario actual y manejar logout sin modificar lógica existente
         document.addEventListener('DOMContentLoaded', () => {
@@ -592,9 +1189,511 @@
         });
     </script>
 
+    <!-- RBAC: ocultar secciones según rol del usuario -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Solo aplicar RBAC si el rol está almacenado (se establece al iniciar sesión)
+                const storedRole = localStorage.getItem('inv_current_role');
+                if (!storedRole) return; // Sesión anterior sin rol → no ocultar nada (debe re-loguearse)
+
+                const permissions = APP_CONFIG.ROLE_PERMISSIONS[storedRole] || APP_CONFIG.ROLE_PERMISSIONS['Admin'];
+
+                // Ocultar links del sidebar que no corresponden al rol
+                document.querySelectorAll('.sidebar-nav a[data-section]').forEach(link => {
+                    const section = link.getAttribute('data-section');
+                    if (!permissions.includes(section)) {
+                        link.style.display = 'none';
+                    }
+                });
+
+                // Asegurar que la sección activa sea una permitida
+                const activeSection = document.querySelector('.content-section.active');
+                if (activeSection && !permissions.includes(activeSection.id)) {
+                    activeSection.classList.remove('active');
+                    const firstAllowed = permissions[0];
+                    const firstSection = document.getElementById(firstAllowed);
+                    const firstLink = document.querySelector(`.sidebar-nav a[data-section="${firstAllowed}"]`);
+                    if (firstSection) firstSection.classList.add('active');
+                    if (firstLink) firstLink.classList.add('active');
+                }
+            } catch (e) { /* no bloquear */ }
+        });
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="script.js"></script>
     <script src="user_management.js"></script>
+
+    <!-- ===== MODAL: Detalle de Pedido (Odoo-Style) ===== -->
+    <div id="modalOrderDetails" class="modal-overlay" style="display:none; align-items:flex-start; padding:20px;">
+        <div class="modal-box"
+            style="width:100%; max-width:1000px; margin:auto; max-height:95vh; display:flex; flex-direction:column;">
+
+            <!-- Header del modal -->
+            <div class="modal-header" style="flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <h3 id="modal_order_title" style="margin:0;"><i class="fas fa-file-invoice"></i> Pedido</h3>
+                    <span id="modal_order_id_label" style="font-size:1.2rem; font-weight:800; color:#666;"></span>
+                </div>
+                <button class="modal-close" onclick="closeModal('modalOrderDetails')">&times;</button>
+            </div>
+
+            <!-- Pipeline de estados (Odoo-style) -->
+            <div id="modal_order_pipeline"
+                style="flex-shrink:0; background:#f8f9fa; padding:12px 20px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                <div class="pipeline-step" id="pipe_borrador" onclick="">
+                    <i class="fas fa-file-alt"></i> Borrador
+                </div>
+                <div class="pipeline-arrow">›</div>
+                <div class="pipeline-step" id="pipe_confirmado">
+                    <i class="fas fa-check"></i> Confirmado
+                </div>
+                <div class="pipeline-arrow">›</div>
+                <div class="pipeline-step" id="pipe_completado">
+                    <i class="fas fa-check-double"></i> Completado
+                </div>
+            </div>
+
+            <!-- Botonera de acciones -->
+            <div id="modal_order_actions"
+                style="flex-shrink:0; padding:12px 20px; border-bottom:1px solid #eee; display:flex; gap:10px;">
+                <button id="mord_save_btn" class="btn secondary-btn" style="display:none;">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+                <button id="mord_confirm_btn" class="btn primary-btn" style="display:none;">
+                    <i class="fas fa-check-circle"></i> Confirmar
+                </button>
+                <button id="mord_complete_btn" class="btn" style="background:#27ae60;color:white;display:none;">
+                    <i class="fas fa-check-double"></i> Completar
+                </button>
+                <button id="mord_cancel_btn" class="btn danger-btn" style="display:none;">
+                    <i class="fas fa-times-circle"></i> Cancelar Pedido
+                </button>
+            </div>
+
+            <div id="modal_order_status" class="status-message" style="margin:0 20px; flex-shrink:0;"></div>
+
+            <!-- Cuerpo del modal -->
+            <div class="modal-body" style="overflow-y:auto; flex:1; padding: 20px;">
+                <!-- Cabecera del pedido -->
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-bottom:20px;">
+                    <div class="form-group" style="margin:0;">
+                        <label id="mord_contact_label">Proveedor / Cliente:</label>
+                        <select id="mord_contacto" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Fecha:</label>
+                        <input type="date" id="mord_fecha" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Método de Pago:</label>
+                        <select id="mord_metodo_pago" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Crédito">Crédito</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0; grid-column:1/-1;">
+                        <label>Notas / Observaciones:</label>
+                        <textarea id="mord_notas" rows="2"
+                            style="width:100%; resize:vertical; border:1px solid #ddd; border-radius:8px; padding:8px;"></textarea>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Descuento (%):</label>
+                        <input type="number" id="mord_descuento" value="0" min="0" max="100" step="0.5"
+                            style="width:100%;">
+                    </div>
+                    <div class="form-group"
+                        style="margin:0; display:flex; align-items:center; gap:10px; padding-top:25px;">
+                        <input type="checkbox" id="mord_apply_iva" checked style="width:20px;height:20px;">
+                        <label for="mord_apply_iva" style="margin:0;cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
+                    </div>
+                </div>
+
+                <!-- Tabla de productos -->
+                <div style="overflow-x:auto; margin-bottom:15px;">
+                    <table class="order-table" id="mord_items_table">
+                        <thead>
+                            <tr>
+                                <th style="width:40%;">Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>Subtotal</th>
+                                <th id="mord_col_actions"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="mord_items_body"></tbody>
+                    </table>
+                </div>
+
+                <div id="mord_add_line_wrapper" style="display:none; margin-bottom:15px;">
+                    <button type="button" class="btn secondary-btn" id="mord_add_line">
+                        <i class="fas fa-plus"></i> Agregar producto
+                    </button>
+                </div>
+
+                <!-- Totales -->
+                <div class="totals-section">
+                    <div class="total-row">
+                        <span>Base Imponible:</span>
+                        <span id="mord_base_imponible">$0</span>
+                    </div>
+                    <div class="total-row" id="mord_descuento_row" style="display:none;">
+                        <span>Descuento:</span>
+                        <span id="mord_descuento_val">-$0</span>
+                    </div>
+                    <div class="total-row">
+                        <span>IVA (19%):</span>
+                        <span id="mord_iva">$0</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Total:</span>
+                        <span id="mord_total">$0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* ---- Pipeline Odoo-style (modal detalle) ---- */
+        .pipeline-step {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-weight: 600;
+            background: #e9ecef;
+            color: #888;
+            cursor: default;
+            transition: all 0.2s;
+        }
+
+        .pipeline-step.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .pipeline-step.done {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .pipeline-step.cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .pipeline-arrow {
+            color: #ccc;
+            font-size: 1.3rem;
+            font-weight: 300;
+        }
+
+        #modalOrderDetails .modal-box {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        /* ---- Vista Lista estilo Odoo ---- */
+        .odoo-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .odoo-pipeline-filter {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .pipeline-filter-btn {
+            padding: 6px 16px;
+            border: 1.5px solid #dee2e6;
+            border-radius: 20px;
+            background: white;
+            color: #555;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+
+        .pipeline-filter-btn:hover {
+            border-color: #007bff;
+            color: #007bff;
+        }
+
+        .pipeline-filter-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .odoo-orders-table tbody tr {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .odoo-orders-table tbody tr:hover {
+            background: #f0f7ff;
+        }
+
+        .odoo-orders-table .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: capitalize;
+        }
+
+        .badge-borrador {
+            background: #e9ecef;
+            color: #555;
+        }
+
+        .badge-confirmado {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .badge-completado {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-cancelado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+
+    <!-- ===== MODAL: Crear Nuevo Pedido ===== -->
+    <div id="modalNewOrder" class="modal-overlay" style="display:none; align-items:flex-start; padding:20px;">
+        <div class="modal-box"
+            style="width:100%; max-width:900px; margin:auto; max-height:95vh; display:flex; flex-direction:column;">
+            <div class="modal-header" style="flex-shrink:0;">
+                <h3 id="newOrd_title"><i class="fas fa-plus-circle"></i> Nuevo Pedido</h3>
+                <button class="modal-close" onclick="closeModal('modalNewOrder')">&times;</button>
+            </div>
+            <div class="modal-body" style="overflow-y:auto; flex:1;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
+                    <div class="form-group" style="margin:0;">
+                        <label id="newOrd_contact_label">Proveedor:</label>
+                        <select id="newOrd_contacto" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Fecha:</label>
+                        <input type="date" id="newOrd_fecha" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Método de Pago:</label>
+                        <select id="newOrd_metodo_pago" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                            <option>Efectivo</option>
+                            <option>Transferencia</option>
+                            <option>Crédito</option>
+                            <option>Cheque</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Descuento (%):</label>
+                        <input type="number" id="newOrd_descuento" value="0" min="0" max="100" step="0.5"
+                            style="width:100%;">
+                    </div>
+                    <div class="form-group" style="margin:0; grid-column:1/-1;">
+                        <label>Notas:</label>
+                        <textarea id="newOrd_notas" rows="2"
+                            style="width:100%; resize:vertical; border:1px solid #ddd; border-radius:8px; padding:8px;"
+                            placeholder="Observaciones..."></textarea>
+                    </div>
+                    <div class="form-group" style="margin:0; display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="newOrd_apply_iva" checked style="width:20px;height:20px;">
+                        <label for="newOrd_apply_iva" style="margin:0;cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto; margin-bottom:12px;">
+                    <table class="order-table" id="newOrd_items_table">
+                        <thead>
+                            <tr>
+                                <th style="width:45%;">Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="newOrd_items_body"></tbody>
+                    </table>
+                </div>
+                <button type="button" class="btn secondary-btn" id="newOrd_add_line">
+                    <i class="fas fa-plus"></i> Agregar producto
+                </button>
+
+                <div class="totals-section" style="margin-top:15px;">
+                    <div class="total-row"><span>Base Imponible:</span><span id="newOrd_base">$0</span></div>
+                    <div class="total-row" id="newOrd_desc_row" style="display:none;"><span>Descuento:</span><span
+                            id="newOrd_desc_val">-$0</span></div>
+                    <div class="total-row"><span>IVA (19%):</span><span id="newOrd_iva">$0</span></div>
+                    <div class="total-row grand-total"><span>Total:</span><span id="newOrd_total">$0</span></div>
+                </div>
+                <div id="newOrd_status" class="status-message" style="margin-top:12px;"></div>
+            </div>
+            <div class="modal-footer" style="flex-shrink:0;">
+                <button class="btn secondary-btn" onclick="closeModal('modalNewOrder')">Cancelar</button>
+                <button class="btn secondary-btn" id="newOrd_draft_btn"><i class="fas fa-save"></i> Guardar
+                    Borrador</button>
+                <button class="btn primary-btn" id="newOrd_confirm_btn"><i class="fas fa-check-circle"></i>
+                    Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: Detalle de Pedido (Odoo-Style) ===== -->
+    <div id="modalOrderDetails" class="modal-overlay" style="display:none; align-items:flex-start; padding:20px;">
+        <div class="modal-box"
+            style="width:100%; max-width:1000px; margin:auto; max-height:95vh; display:flex; flex-direction:column;">
+            <div class="modal-header" style="flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <h3 id="modal_order_title" style="margin:0;"><i class="fas fa-file-invoice"></i> Pedido</h3>
+                    <span id="modal_order_id_label" style="font-size:1.2rem; font-weight:800; color:#666;"></span>
+                </div>
+                <button class="modal-close" onclick="closeModal('modalOrderDetails')">&times;</button>
+            </div>
+            <div id="modal_order_pipeline"
+                style="flex-shrink:0; background:#f8f9fa; padding:12px 20px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                <div class="pipeline-step" id="pipe_borrador"><i class="fas fa-file-alt"></i> Borrador</div>
+                <div class="pipeline-arrow">›</div>
+                <div class="pipeline-step" id="pipe_confirmado"><i class="fas fa-check"></i> Confirmado</div>
+                <div class="pipeline-arrow">›</div>
+                <div class="pipeline-step" id="pipe_completado"><i class="fas fa-check-double"></i> Completado</div>
+            </div>
+            <div id="modal_order_actions"
+                style="flex-shrink:0; padding:12px 20px; border-bottom:1px solid #eee; display:flex; gap:10px;">
+                <button id="mord_save_btn" class="btn secondary-btn" style="display:none;"><i class="fas fa-save"></i>
+                    Guardar Cambios</button>
+                <button id="mord_confirm_btn" class="btn primary-btn" style="display:none;"><i
+                        class="fas fa-check-circle"></i> Confirmar</button>
+                <button id="mord_complete_btn" class="btn" style="background:#27ae60;color:white;display:none;"><i
+                        class="fas fa-check-double"></i> Completar</button>
+                <button id="mord_cancel_btn" class="btn danger-btn" style="display:none;"><i
+                        class="fas fa-times-circle"></i> Cancelar Pedido</button>
+            </div>
+            <div id="modal_order_status" class="status-message" style="margin:0 20px; flex-shrink:0;"></div>
+            <div class="modal-body" style="overflow-y:auto; flex:1; padding:20px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-bottom:20px;">
+                    <div class="form-group" style="margin:0;"><label id="mord_contact_label">Proveedor /
+                            Cliente:</label>
+                        <select id="mord_contacto" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;"><label>Fecha:</label><input type="date" id="mord_fecha"
+                            style="width:100%;"></div>
+                    <div class="form-group" style="margin:0;"><label>Método de Pago:</label>
+                        <select id="mord_metodo_pago" style="width:100%;">
+                            <option value="">Seleccionar</option>
+                            <option>Efectivo</option>
+                            <option>Transferencia</option>
+                            <option>Crédito</option>
+                            <option>Cheque</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0; grid-column:1/-1;"><label>Notas:</label>
+                        <textarea id="mord_notas" rows="2"
+                            style="width:100%; resize:vertical; border:1px solid #ddd; border-radius:8px; padding:8px;"></textarea>
+                    </div>
+                    <div class="form-group" style="margin:0;"><label>Descuento (%):</label>
+                        <input type="number" id="mord_descuento" value="0" min="0" max="100" step="0.5"
+                            style="width:100%;">
+                    </div>
+                    <div class="form-group"
+                        style="margin:0; display:flex; align-items:center; gap:10px; padding-top:25px;">
+                        <input type="checkbox" id="mord_apply_iva" checked style="width:20px;height:20px;">
+                        <label for="mord_apply_iva" style="margin:0;cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
+                    </div>
+                </div>
+                <div style="overflow-x:auto; margin-bottom:15px;">
+                    <table class="order-table" id="mord_items_table">
+                        <thead>
+                            <tr>
+                                <th style="width:40%;">Producto</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unit.</th>
+                                <th>Subtotal</th>
+                                <th id="mord_col_actions"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="mord_items_body"></tbody>
+                    </table>
+                </div>
+                <div id="mord_add_line_wrapper" style="display:none; margin-bottom:15px;">
+                    <button type="button" class="btn secondary-btn" id="mord_add_line"><i class="fas fa-plus"></i>
+                        Agregar producto</button>
+                </div>
+                <div class="totals-section">
+                    <div class="total-row"><span>Base Imponible:</span><span id="mord_base_imponible">$0</span></div>
+                    <div class="total-row" id="mord_descuento_row" style="display:none;"><span>Descuento:</span><span
+                            id="mord_descuento_val">-$0</span></div>
+                    <div class="total-row"><span>IVA (19%):</span><span id="mord_iva">$0</span></div>
+                    <div class="total-row grand-total"><span>Total:</span><span id="mord_total">$0</span></div>
+                </div>
+
+                <!-- ===== CHATTER / LOG DE ACTIVIDAD ===== -->
+                <div
+                    style="clear:both; padding-top:30px; margin-top:20px; border-top:2px solid var(--border, #e2e8f0);">
+                    <h3 style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                        <i class="fas fa-comments" style="color:var(--primary-color,#4361ee);"></i>
+                        Historial de Actividad
+                    </h3>
+
+                    <!-- Feed de mensajes -->
+                    <div id="chatter_feed"
+                        style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px; max-height:320px; overflow-y:auto; padding-right:4px;">
+                        <div style="text-align:center; color:#aaa; padding:20px; font-size:0.85rem;">
+                            <i class="fas fa-clock" style="font-size:1.5rem; display:block; margin-bottom:8px;"></i>
+                            Cargando actividad...
+                        </div>
+                    </div>
+
+                    <!-- Formulario nueva nota -->
+                    <div
+                        style="background:var(--bg,#f0f2f8); border-radius:12px; padding:16px; border:1.5px solid var(--border,#e2e8f0);">
+                        <div style="display:flex; align-items:flex-start; gap:12px;">
+                            <div class="user-avatar" id="chatter_user_avatar"
+                                style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4361ee,#3a0ca3);color:white;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;flex-shrink:0;">
+                                ?
+                            </div>
+                            <div style="flex:1;">
+                                <textarea id="chatter_input" rows="2" placeholder="Agrega una nota o comentario..."
+                                    style="width:100%; border:1.5px solid var(--border,#e2e8f0); border-radius:10px; padding:10px 14px; font-family:inherit; font-size:0.875rem; resize:none; background:white; outline:none; transition:border-color 0.2s;"></textarea>
+                                <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                                    <button id="chatter_send_btn" class="btn primary-btn" style="padding:7px 18px;">
+                                        <i class="fas fa-paper-plane"></i> Enviar nota
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <!-- Contenedor de Toasts -->
     <div id="toast-container"

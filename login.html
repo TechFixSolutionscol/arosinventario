@@ -4,65 +4,603 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>FIXOPS</title>
-    <link rel="stylesheet" href="estilo.css">
+    <meta name="description" content="FixOps — Sistema de Gestión de Inventario. Inicia sesión para continuar.">
+    <title>FixOps — Iniciar Sesión</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="config.js"></script>
     <script src="auth.js" defer></script>
+
     <style>
-        .auth-container {
-            max-width: 420px;
-            margin: 60px auto;
-            padding: 24px;
-            border-radius: 8px;
-            background: var(--card-bg, #fff);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, .06)
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        .auth-actions {
+        :root {
+            --primary: #4361ee;
+            --primary-d: #3a0ca3;
+            --secondary: #7209b7;
+            --accent: #f72585;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --card: #ffffff;
+            --bg: #f0f2f8;
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* ── Layout split ── */
+        .login-wrap {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 100vh;
+        }
+
+        /* ── Panel izquierdo (hero) ── */
+        .hero-panel {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 80%, #533483 100%);
             display: flex;
-            gap: 8px;
-            margin-bottom: 12px
-        }
-
-        .hidden {
-            display: none
-        }
-
-        .logo {
-            width: 300px;
-            margin-bottom: 12px;
-            margin-left: auto;
-            margin-right: auto;
-            display: block;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+            padding: 60px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Orbes decorativos */
+        .hero-panel::before,
+        .hero-panel::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        .hero-panel::before {
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, #4361ee, transparent);
+            top: -100px;
+            left: -100px;
+            animation: floatOrb 8s ease-in-out infinite;
+        }
+
+        .hero-panel::after {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, #f72585, transparent);
+            bottom: -80px;
+            right: -60px;
+            animation: floatOrb 10s ease-in-out infinite reverse;
+        }
+
+        @keyframes floatOrb {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(20px, 30px) scale(1.08);
+            }
+        }
+
+        .hero-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 24px;
+            object-fit: cover;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            margin-bottom: 28px;
+            position: relative;
+            z-index: 1;
+            animation: popIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.7) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .hero-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.6s ease both 0.1s;
+        }
+
+        .hero-title span {
+            background: linear-gradient(90deg, #818cf8, #f72585);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.58);
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.7;
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.6s ease both 0.2s;
+        }
+
+        .hero-features {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.6s ease both 0.3s;
+        }
+
+        .hero-feature {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.9rem;
+        }
+
+        .hero-feature .feat-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ── Panel derecho (formulario) ── */
+        .form-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 48px;
+            background: var(--card);
+            position: relative;
+        }
+
+        .form-card {
+            width: 100%;
+            max-width: 400px;
+            animation: slideUp 0.5s ease both 0.15s;
+        }
+
+        .form-greeting {
+            margin-bottom: 32px;
+        }
+
+        .form-greeting h1 {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .form-greeting p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Input groups */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-wrap i.input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.9rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .input-wrap input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: #f8fafc;
+            color: var(--text);
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-wrap input:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.12);
+        }
+
+        .input-wrap input:focus+i.input-icon,
+        .input-wrap:focus-within i.input-icon {
+            color: var(--primary);
+        }
+
+        .input-wrap .toggle-pass {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .input-wrap .toggle-pass:hover {
+            color: var(--primary);
+        }
+
+        /* Botón submit */
+        .login-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-d));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.35);
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(67, 97, 238, 0.45);
+        }
+
+        .login-btn:hover::after {
+            opacity: 1;
+        }
+
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        .login-btn.loading {
+            pointer-events: none;
+            opacity: 0.75;
+        }
+
+        /* Spinner inline */
+        .spin {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Mensaje de estado */
+        .login-msg {
+            margin-top: 18px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: none;
+            border-left: 4px solid;
+            animation: slideUp 0.3s ease;
+        }
+
+        .login-msg.error {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #ef4444;
+        }
+
+        .login-msg.success {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #dcfce7;
+            color: #166534;
+            border-color: #22c55e;
+        }
+
+        .login-msg.info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #3b82f6;
+        }
+
+        /* Footer */
+        .form-footer {
+            margin-top: 36px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .form-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 800px) {
+            .login-wrap {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-panel {
+                padding: 40px 24px;
+                min-height: 220px;
+            }
+
+            .hero-features {
+                display: none;
+            }
+
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .form-panel {
+                padding: 40px 24px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="auth-container">
-        <img src="assets/img/logo.png" alt="Logo" class="logo">
+    <div class="login-wrap">
 
-        <form id="loginForm" class="form-grid">
-            <div class="form-group">
-                <label for="login_user">Usuario</label>
-                <input id="login_user" required>
+        <!-- ===== PANEL HERO ===== -->
+        <div class="hero-panel">
+            <img src="assets/img/logo.png" alt="FixOps Logo" class="hero-logo">
+            <div class="hero-title">Fix<span>Ops</span></div>
+            <p class="hero-subtitle">Gestión inteligente de inventario, compras y ventas para tu negocio.</p>
+
+            <div class="hero-features">
+                <div class="hero-feature">
+                    <div class="feat-icon" style="background:rgba(67,97,238,0.2); color:#818cf8;">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                    <span>Control de inventario en tiempo real</span>
+                </div>
+                <div class="hero-feature">
+                    <div class="feat-icon" style="background:rgba(46,196,182,0.2); color:#5eead4;">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                    <span>Gestión de compras y ventas estilo Odoo</span>
+                </div>
+                <div class="hero-feature">
+                    <div class="feat-icon" style="background:rgba(247,37,133,0.2); color:#f87171;">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <span>Dashboard financiero con gráficos</span>
+                </div>
+                <div class="hero-feature">
+                    <div class="feat-icon" style="background:rgba(114,9,183,0.2); color:#c084fc;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <span>Roles y permisos de usuario</span>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="login_pass">Contraseña</label>
-                <input id="login_pass" type="password" required>
-            </div>
-            <button type="submit" class="btn primary-btn full-width">Iniciar sesión</button>
-            <div id="loginMessage" class="status-message" style="display:block;margin-top:10px"></div>
-        </form>
-
-        <!-- Registro público deshabilitado: la creación de usuarios se gestiona internamente -->
-
-        <div style="margin-top:12px;text-align:center;font-size:0.85em;color:#666">
-            <p style="margin-top:8px">© 2026 Todos los derechos reservados - Desarrollado por <a
-                    href="https://techfixsolutions.site" class="link-like" target="_blank">Techfix Solutions</a></p>
         </div>
+
+        <!-- ===== PANEL FORM ===== -->
+        <div class="form-panel">
+            <div class="form-card">
+                <div class="form-greeting">
+                    <h1>Bienvenido 👋</h1>
+                    <p>Ingresa tus credenciales para acceder al sistema</p>
+                </div>
+
+                <form id="loginForm" autocomplete="off" novalidate>
+
+                    <div class="input-group">
+                        <label for="login_user">Usuario</label>
+                        <div class="input-wrap">
+                            <i class="fas fa-user input-icon"></i>
+                            <input id="login_user" type="text" placeholder="Tu nombre de usuario" required
+                                autocomplete="username">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="login_pass">Contraseña</label>
+                        <div class="input-wrap">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input id="login_pass" type="password" placeholder="••••••••" required
+                                autocomplete="current-password">
+                            <button type="button" class="toggle-pass" id="togglePass" tabindex="-1"
+                                title="Mostrar/ocultar contraseña">
+                                <i class="fas fa-eye" id="togglePassIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="loginSubmitBtn">
+                        <i class="fas fa-sign-in-alt" id="loginBtnIcon"></i>
+                        <span id="loginBtnText">Iniciar sesión</span>
+                    </button>
+
+                    <div class="login-msg" id="loginMessage"></div>
+                </form>
+
+                <div class="form-footer">
+                    <p>© 2026 Todos los derechos reservados &mdash; Desarrollado por
+                        <a href="https://techfixsolutions.site" target="_blank" rel="noopener">TechFix Solutions</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <script>
+        // Toggle contraseña
+        document.getElementById('togglePass').addEventListener('click', () => {
+            const passEl = document.getElementById('login_pass');
+            const icon = document.getElementById('togglePassIcon');
+            const isPass = passEl.type === 'password';
+            passEl.type = isPass ? 'text' : 'password';
+            icon.className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+        });
+
+        // Helpers mensaje
+        function showMsg(msg, type) {
+            const el = document.getElementById('loginMessage');
+            const icons = { error: 'fa-circle-exclamation', success: 'fa-circle-check', info: 'fa-circle-info' };
+            el.className = 'login-msg ' + type;
+            el.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> ${msg}`;
+        }
+
+        // Estado botón
+        function setLoading(loading) {
+            const btn = document.getElementById('loginSubmitBtn');
+            const icon = document.getElementById('loginBtnIcon');
+            const txt = document.getElementById('loginBtnText');
+            btn.classList.toggle('loading', loading);
+            icon.className = loading ? 'fas fa-circle-notch spin' : 'fas fa-sign-in-alt';
+            txt.textContent = loading ? 'Verificando...' : 'Iniciar sesión';
+        }
+
+        // Submit
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = document.getElementById('login_user').value.trim();
+            const pass = document.getElementById('login_pass').value;
+
+            if (!user || !pass) {
+                showMsg('Completa usuario y contraseña.', 'error');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                await new Promise(r => setTimeout(r, 200)); // Esperar auth.js
+                const result = await window.InvAuth.login(user, pass);
+                if (result.success) {
+                    showMsg('¡Acceso concedido! Redirigiendo...', 'success');
+                    setTimeout(() => location.href = 'index.html', 900);
+                } else {
+                    showMsg(result.message || 'Credenciales incorrectas.', 'error');
+                    setLoading(false);
+                }
+            } catch (err) {
+                showMsg('Error de conexión. Intenta de nuevo.', 'error');
+                setLoading(false);
+            }
+        });
+
+        // Enter en usuario → foco en contraseña
+        document.getElementById('login_user').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('login_pass').focus();
+            }
+        });
+    </script>
 </body>
 
 </html>

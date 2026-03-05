@@ -1,7 +1,7 @@
 // ***************************************************************
 // ⚠️ 1. REEMPLAZA ESTE VALOR con el ID real de tu Google Sheet
 // ***************************************************************
-const SPREADSHEET_ID = "1yEVQX0Ylz0kTvMsU9VCIF3x7Q1ZffAVTuQ3XbXaY4dM";
+const SPREADSHEET_ID = "1uExfNbKUU-gMZP0lu96mXwbPE8sYSI-C1w6FF2iFQZw";
 
 // Nombres de las pestañas
 const HOJA_CATEGORIAS = "Categorias";
@@ -16,17 +16,29 @@ const HOJA_USUARIOS = "Usuarios";
 // Encabezados
 const CATEGORIAS_HEADERS = ["id", "nombre"];
 const PRODUCTOS_HEADERS = ["id", "nombre", "código", "categoría", "tipo", "precio_compra", "precio_venta", "stock", "fecha_creado"];
-const COMPRAS_HEADERS = ["id", "producto_id", "cantidad", "precio_compra", "fecha", "proveedor"];
-const VENTAS_HEADERS = ["id", "producto_id", "cantidad", "precio_venta", "fecha", "cliente"];
-const PROVEEDORES_HEADERS = ["id", "nombre", "telefono"];
-const CLIENTES_HEADERS = ["id", "nombre", "telefono"];
+const COMPRAS_HEADERS = ["id", "producto_id", "cantidad", "precio_compra", "fecha", "proveedor", "pedido_id"];
+const VENTAS_HEADERS = ["id", "producto_id", "cantidad", "precio_venta", "fecha", "cliente", "pedido_id"];
+const PROVEEDORES_HEADERS = ["id", "tipo_contacto", "identificacion", "nombre", "email", "telefono", "direccion"];
+const CLIENTES_HEADERS = ["id", "tipo_contacto", "identificacion", "nombre", "email", "telefono", "direccion"];
 const RESUMEN_HEADERS = ["fecha", "total_ventas", "total_compras", "ganancia", "productos_vendidos"];
 const USUARIOS_HEADERS = ["usuario", "hash", "rol", "created"];
+
+// Pedidos (encabezados de órdenes)
+const HOJA_PEDIDOS = "Pedidos";
+const PEDIDOS_HEADERS = ["id", "tipo", "estado", "contacto", "fecha", "notas", "metodo_pago", "descuento", "total", "usuario", "fecha_creacion", "fecha_actualizado"];
+
+// Chatter / Log de actividad
+const HOJA_LOG = "Log";
+const LOG_HEADERS = ["id", "referencia_id", "modulo", "tipo", "mensaje", "usuario", "fecha"];
 // Credenciales por defecto (se crearán automáticamente al inicializar la BD)
 const DEFAULT_ADMIN_USER = "admin";
 const DEFAULT_ADMIN_PASS = "admin";
-// Clave admin fija (fallback) para crear usuarios si no está en Script Properties
-const ADMIN_KEY_CONST = "Excol123**";
+// Clave admin se lee exclusivamente de Script Properties (no hardcodeada)
+// Para configurar: en Apps Script Editor > Proyecto > Propiedades > Script Properties > agregar ADMIN_KEY
+function getAdminKey() {
+    var props = PropertiesService.getScriptProperties();
+    return props.getProperty('ADMIN_KEY') || '';
+}
 
 // --- FUNCIÓN CENTRAL PARA ACCEDER A LA HOJA ---
 function getSpreadsheet() {
@@ -58,6 +70,12 @@ function doGet(e) {
             result = getInventario();
         } else if (action === "getResumenDiario") {
             result = getResumenDiario();
+        } else if (action === "getPedidos") {
+            result = getPedidos(e.parameter);
+        } else if (action === "getDetallePedido") {
+            result = getDetallePedido(e.parameter);
+        } else if (action === "getChatter") {
+            result = getChatter(e.parameter);
         } else if (action === "getData" && sheetName) {
             result = getData(sheetName);
         } else {
@@ -89,8 +107,16 @@ function doPost(e) {
         let result;
         if (action === "agregarCategoria") {
             result = agregarCategoria(requestData);
+        } else if (action === "editarCategoria") {
+            result = editarCategoria(requestData);
+        } else if (action === "eliminarCategoria") {
+            result = eliminarCategoria(requestData);
         } else if (action === "agregarProducto") {
             result = agregarProducto(requestData);
+        } else if (action === "editarProducto") {
+            result = editarProducto(requestData);
+        } else if (action === "archivarProducto") {
+            result = archivarProducto(requestData);
         } else if (action === "registrarTransaccion") {
             result = registrarTransaccion(requestData);
         } else if (action === 'authLogin') {
@@ -101,14 +127,34 @@ function doPost(e) {
             result = migrateUsersToHash(requestData);
         } else if (action === 'registrarTransaccionBatch') {
             result = registrarTransaccionBatch(requestData);
+        } else if (action === 'crearPedido') {
+            result = crearPedido(requestData);
+        } else if (action === 'actualizarPedido') {
+            result = actualizarPedido(requestData);
+        } else if (action === 'confirmarPedido') {
+            result = confirmarPedido(requestData);
+        } else if (action === 'completarPedido') {
+            result = completarPedido(requestData);
+        } else if (action === 'cancelarPedido') {
+            result = cancelarPedido(requestData);
         } else if (action === 'agregarRegistroGenerico') {
             result = agregarRegistroGenerico(requestData);
+        } else if (action === 'editarContacto') {
+            result = editarContacto(requestData);
+        } else if (action === 'eliminarContacto') {
+            result = eliminarContacto(requestData);
         } else if (action === 'updateUserRole') {
             result = updateUserRole(requestData);
         } else if (action === 'deleteUser') {
             result = deleteUser(requestData);
         } else if (action === 'getNextOrderId') {
             result = getNextOrderId(requestData);
+        } else if (action === 'cambiarPassword') {
+            result = cambiarPassword(requestData);
+        } else if (action === 'resetPassword') {
+            result = resetPassword(requestData);
+        } else if (action === 'addChatMessage') {
+            result = addChatMessage(requestData);
         } else {
             result = { status: "error", message: "Acción POST no reconocida." };
         }
@@ -195,6 +241,64 @@ function agregarCategoria(data) {
     }
 }
 
+function editarCategoria(data) {
+    if (!data || !data.id || !data.nombre) {
+        return { status: 'error', message: 'Faltan parámetros: id y nombre.' };
+    }
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_CATEGORIAS);
+    if (!sheet) return { status: 'error', message: 'Hoja de categorías no encontrada.' };
+    var values = sheet.getDataRange().getValues();
+    var targetId = String(data.id).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            sheet.getRange(i + 1, 2).setValue(String(data.nombre).trim());
+            return { status: 'success', message: 'Categoría actualizada correctamente.' };
+        }
+    }
+    return { status: 'error', message: 'Categoría no encontrada.' };
+}
+
+function eliminarCategoria(data) {
+    if (!data || !data.id) {
+        return { status: 'error', message: 'Falta el ID de la categoría.' };
+    }
+    var ss = getSpreadsheet();
+    var targetId = String(data.id).trim();
+    var catSheet = ss.getSheetByName(HOJA_CATEGORIAS);
+    if (!catSheet) return { status: 'error', message: 'Hoja de categorías no encontrada.' };
+    var catValues = catSheet.getDataRange().getValues();
+    var catName = '';
+    var catRow = -1;
+    for (var j = 1; j < catValues.length; j++) {
+        if (String(catValues[j][0]).trim() === targetId) {
+            catName = String(catValues[j][1]);
+            catRow = j + 1;
+            break;
+        }
+    }
+    if (catRow === -1) return { status: 'error', message: 'Categoría no encontrada.' };
+    // Verificar productos asociados
+    var productsSheet = ss.getSheetByName(HOJA_PRODUCTOS);
+    if (productsSheet) {
+        var prodValues = productsSheet.getDataRange().getValues();
+        var headers = prodValues[0];
+        var catIdx = -1;
+        for (var h = 0; h < headers.length; h++) {
+            if (String(headers[h]).toLowerCase().indexOf('categor') !== -1) { catIdx = h; break; }
+        }
+        if (catIdx !== -1) {
+            for (var i = 1; i < prodValues.length; i++) {
+                if (String(prodValues[i][catIdx]).toLowerCase() === catName.toLowerCase()) {
+                    return { status: 'error', message: 'No se puede eliminar: hay productos asociados a esta categoría. Reasigne los productos primero.' };
+                }
+            }
+        }
+    }
+    catSheet.deleteRow(catRow);
+    return { status: 'success', message: 'Categoría \'' + catName + '\' eliminada correctamente.' };
+}
+
 // ----------------------------------------------------------------------
 // FUNCIONES DE GESTIÓN DE PRODUCTOS Y BÚSQUEDA
 // ----------------------------------------------------------------------
@@ -265,9 +369,118 @@ function agregarProducto(data) {
     }
 }
 
+function editarProducto(data) {
+    if (!data || !data.id) return { status: 'error', message: 'Falta el ID del producto.' };
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_PRODUCTOS);
+    if (!sheet) return { status: 'error', message: 'Hoja de productos no encontrada.' };
+    var values = sheet.getDataRange().getValues();
+    var targetId = String(data.id).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            var row = i + 1;
+            if (data.nombre !== undefined) sheet.getRange(row, 2).setValue(data.nombre);
+            if (data.codigo !== undefined) sheet.getRange(row, 3).setValue(data.codigo);
+            if (data.categoria !== undefined) sheet.getRange(row, 4).setValue(data.categoria);
+            if (data.tipo !== undefined) sheet.getRange(row, 5).setValue(data.tipo);
+            if (data.precio_compra !== undefined) sheet.getRange(row, 6).setValue(parseFloat(data.precio_compra));
+            if (data.precio_venta !== undefined) sheet.getRange(row, 7).setValue(parseFloat(data.precio_venta));
+            if (data.stock !== undefined) sheet.getRange(row, 8).setValue(parseInt(data.stock));
+            return { status: 'success', message: 'Producto actualizado correctamente.' };
+        }
+    }
+    return { status: 'error', message: 'Producto no encontrado.' };
+}
+
+function archivarProducto(data) {
+    if (!data || !data.id) return { status: 'error', message: 'Falta el ID del producto.' };
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_PRODUCTOS);
+    if (!sheet) return { status: 'error', message: 'Hoja de productos no encontrada.' };
+    var values = sheet.getDataRange().getValues();
+    var targetId = String(data.id).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            sheet.deleteRow(i + 1);
+            return { status: 'success', message: 'Producto eliminado correctamente.' };
+        }
+    }
+    return { status: 'error', message: 'Producto no encontrado.' };
+}
+
 // ----------------------------------------------------------------------
-// FUNCIONES DE GESTIÓN DE TRANSACCIONES (COMPRAS/VENTAS)
+// FUNCIONES DE CONTACTOS (Proveedores/Clientes)
 // ----------------------------------------------------------------------
+function agregarRegistroGenerico(data) {
+    if (!data || !data.sheetName || !data.data) {
+        return { status: 'error', message: 'Faltan parámetros (sheetName, data).' };
+    }
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(data.sheetName);
+    if (!sheet) return { status: 'error', message: 'Hoja ' + data.sheetName + ' no encontrada.' };
+
+    // ["id", "tipo_contacto", "identificacion", "nombre", "email", "telefono", "direccion"]
+    var newId = data.data.id || generateUniqueAppId();
+    var row = [
+        newId,
+        data.data.tipo_contacto || '',
+        data.data.identificacion || '',
+        data.data.nombre || '',
+        data.data.email || '',
+        data.data.telefono || '',
+        data.data.direccion || ''
+    ];
+
+    try {
+        sheet.appendRow(row);
+        return { status: 'success', message: 'Registro agregado correctamente.' };
+    } catch (e) {
+        return { status: 'error', message: 'Error: ' + e.message };
+    }
+}
+
+function editarContacto(data) {
+    if (!data || !data.sheetName || !data.id) {
+        return { status: 'error', message: 'Faltan parámetros (sheetName, id).' };
+    }
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(data.sheetName);
+    if (!sheet) return { status: 'error', message: 'Hoja no encontrada.' };
+    var values = sheet.getDataRange().getValues();
+    var targetId = String(data.id).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            var row = i + 1;
+            if (data.tipo_contacto !== undefined) sheet.getRange(row, 2).setValue(data.tipo_contacto);
+            if (data.identificacion !== undefined) sheet.getRange(row, 3).setValue(data.identificacion);
+            if (data.nombre !== undefined) sheet.getRange(row, 4).setValue(data.nombre);
+            if (data.email !== undefined) sheet.getRange(row, 5).setValue(data.email);
+            if (data.telefono !== undefined) sheet.getRange(row, 6).setValue(data.telefono);
+            if (data.direccion !== undefined) sheet.getRange(row, 7).setValue(data.direccion);
+            return { status: 'success', message: 'Contacto actualizado.' };
+        }
+    }
+    return { status: 'error', message: 'Contacto no encontrado.' };
+}
+
+function eliminarContacto(data) {
+    if (!data || !data.sheetName || !data.id) {
+        return { status: 'error', message: 'Faltan parámetros (sheetName, id).' };
+    }
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(data.sheetName);
+    if (!sheet) return { status: 'error', message: 'Hoja no encontrada.' };
+    var values = sheet.getDataRange().getValues();
+    var targetId = String(data.id).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            sheet.deleteRow(i + 1);
+            return { status: 'success', message: 'Contacto eliminado.' };
+        }
+    }
+    return { status: 'error', message: 'Contacto no encontrado.' };
+}
+
 function registrarTransaccion(data) {
     const ss = getSpreadsheet();
     const action = data.type; // 'compra' o 'venta'
@@ -508,18 +721,8 @@ function authLogin(data) {
             var userRol = String(users[i].rol || 'Vendedor'); // Default a Vendedor si no tiene rol
             var incomingHash = hashPasswordAppsScript(password);
 
-            // Aceptar si la celda contiene el hash SHA-256 o la contraseña en claro
-            if (storedHash === incomingHash) {
-                return { status: 'success', message: 'Autenticación correcta', usuario: usuario, rol: userRol };
-            }
-
-            // También permitir autenticación si el valor almacenado coincide exactamente con la contraseña enviada
-            if (storedHash === password) {
-                return { status: 'success', message: 'Autenticación correcta (contraseña en claro)', usuario: usuario, rol: userRol };
-            }
-
-            // Intentar comparar con trim y sin mayúsculas por si el valor fue guardado con espacios
-            if (storedHash.trim() === incomingHash || storedHash.trim() === password.trim()) {
+            // Solo aceptar autenticación por hash SHA-256
+            if (storedHash === incomingHash || storedHash.trim() === incomingHash) {
                 return { status: 'success', message: 'Autenticación correcta', usuario: usuario, rol: userRol };
             }
 
@@ -533,14 +736,14 @@ function createUserInternal(data) {
     // data.usuario, data.password, data.adminKey, data.rol (opcional)
     if (!data || !data.usuario || !data.password || !data.adminKey) return { status: 'error', message: 'Faltan parámetros.' };
     var adminKey = String(data.adminKey);
-    var props = PropertiesService.getScriptProperties();
-    var stored = props.getProperty('ADMIN_KEY');
-    // Si existe ADMIN_KEY en Properties, usarla; si no, permitir la constante ADMIN_KEY_CONST
-    if (stored) {
-        if (adminKey !== stored) return { status: 'error', message: 'Clave admin inválida.' };
-    } else {
-        if (adminKey !== ADMIN_KEY_CONST) return { status: 'error', message: 'Clave admin inválida.' };
-    }
+    var storedKey = getAdminKey();
+    if (!storedKey) return { status: 'error', message: 'ADMIN_KEY no configurada en Script Properties. Configure la clave admin.' };
+    if (adminKey !== storedKey) return { status: 'error', message: 'Clave admin inválida.' };
+
+    // Validar fortaleza de contraseña
+    var password = String(data.password);
+    if (password.length < 6) return { status: 'error', message: 'La contraseña debe tener al menos 6 caracteres.' };
+    if (!/\d/.test(password)) return { status: 'error', message: 'La contraseña debe contener al menos un número.' };
 
     var ss = getSpreadsheet();
     var sheet = ss.getSheetByName(HOJA_USUARIOS);
@@ -580,14 +783,9 @@ function createUserInternal(data) {
  */
 function migrateUsersToHash(data) {
     if (!data || !data.adminKey) return { status: 'error', message: 'Falta adminKey.' };
-    var props = PropertiesService.getScriptProperties();
-    var stored = props.getProperty('ADMIN_KEY');
-    // permitir clave desde Properties o usar la constante ADMIN_KEY_CONST si no está configurada
-    if (stored) {
-        if (String(data.adminKey) !== stored) return { status: 'error', message: 'Clave admin inválida.' };
-    } else {
-        if (String(data.adminKey) !== ADMIN_KEY_CONST) return { status: 'error', message: 'Clave admin inválida.' };
-    }
+    var storedKey = getAdminKey();
+    if (!storedKey) return { status: 'error', message: 'ADMIN_KEY no configurada.' };
+    if (String(data.adminKey) !== storedKey) return { status: 'error', message: 'Clave admin inválida.' };
 
     var ss = getSpreadsheet();
     var sheet = ss.getSheetByName(HOJA_USUARIOS);
@@ -656,10 +854,17 @@ function createOrResetSheet(ss, name, headers) {
         action = "creada";
     }
 
-    // Limpiar contenido y establecer encabezados
-    sheet.clearContents();
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
+    if (sheet.getLastRow() === 0) {
+        sheet.clearContents();
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        sheet.setFrozenRows(1);
+    } else {
+        var currentHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+        if (currentHeaders.join('').trim() === '') {
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+            sheet.setFrozenRows(1);
+        }
+    }
 
     return `Pestaña '${name}' ${action}.`;
 }
@@ -676,8 +881,7 @@ function iniciarBaseDeDatos() {
     msg.push(createOrResetSheet(ss, HOJA_USUARIOS, USUARIOS_HEADERS));
     msg.push(createOrResetSheet(ss, HOJA_PROVEEDORES, PROVEEDORES_HEADERS));
     msg.push(createOrResetSheet(ss, HOJA_CLIENTES, CLIENTES_HEADERS));
-    msg.push(createOrResetSheet(ss, HOJA_PROVEEDORES, PROVEEDORES_HEADERS));
-    msg.push(createOrResetSheet(ss, HOJA_CLIENTES, CLIENTES_HEADERS));
+    msg.push(createOrResetSheet(ss, HOJA_PEDIDOS, PEDIDOS_HEADERS));
 
     // Añadir usuario admin por defecto si la hoja está vacía (sólo encabezados)
     try {
@@ -714,6 +918,8 @@ function resetearBaseDeDatos() {
     msg.push(createOrResetSheet(ss, HOJA_VENTAS, VENTAS_HEADERS));
     msg.push(createOrResetSheet(ss, HOJA_RESUMEN, RESUMEN_HEADERS));
     msg.push(createOrResetSheet(ss, HOJA_USUARIOS, USUARIOS_HEADERS));
+    msg.push(createOrResetSheet(ss, HOJA_PROVEEDORES, PROVEEDORES_HEADERS));
+    msg.push(createOrResetSheet(ss, HOJA_CLIENTES, CLIENTES_HEADERS));
 
     // Añadir usuario admin por defecto si la hoja está vacía (sólo encabezados)
     try {
@@ -740,13 +946,9 @@ function updateUserRole(data) {
 
     // Validar admin key
     var adminKey = String(data.adminKey);
-    var props = PropertiesService.getScriptProperties();
-    var stored = props.getProperty('ADMIN_KEY');
-    if (stored) {
-        if (adminKey !== stored) return { status: 'error', message: 'Clave admin inválida.' };
-    } else {
-        if (adminKey !== ADMIN_KEY_CONST) return { status: 'error', message: 'Clave admin inválida.' };
-    }
+    var storedKey = getAdminKey();
+    if (!storedKey) return { status: 'error', message: 'ADMIN_KEY no configurada.' };
+    if (adminKey !== storedKey) return { status: 'error', message: 'Clave admin inválida.' };
 
     // Validar rol
     var nuevoRol = String(data.nuevoRol).trim();
@@ -783,13 +985,9 @@ function deleteUser(data) {
 
     // Validar admin key
     var adminKey = String(data.adminKey);
-    var props = PropertiesService.getScriptProperties();
-    var stored = props.getProperty('ADMIN_KEY');
-    if (stored) {
-        if (adminKey !== stored) return { status: 'error', message: 'Clave admin inválida.' };
-    } else {
-        if (adminKey !== ADMIN_KEY_CONST) return { status: 'error', message: 'Clave admin inválida.' };
-    }
+    var storedKey = getAdminKey();
+    if (!storedKey) return { status: 'error', message: 'ADMIN_KEY no configurada.' };
+    if (adminKey !== storedKey) return { status: 'error', message: 'Clave admin inválida.' };
 
     var ss = getSpreadsheet();
     var sheet = ss.getSheetByName(HOJA_USUARIOS);
@@ -858,4 +1056,511 @@ function getNextOrderId(data) {
     }
 
     return { status: 'success', nextId: prefix + (maxId + 1) };
+}
+
+// ========== PASSWORD MANAGEMENT ==========
+
+/**
+ * Cambio de contraseña por el propio usuario.
+ * Requiere: { usuario, passwordActual, passwordNueva }
+ */
+function cambiarPassword(data) {
+    if (!data || !data.usuario || !data.passwordActual || !data.passwordNueva) {
+        return { status: 'error', message: 'Faltan parámetros: usuario, passwordActual, passwordNueva.' };
+    }
+
+    var password = String(data.passwordNueva);
+    if (password.length < 6) return { status: 'error', message: 'La contraseña nueva debe tener al menos 6 caracteres.' };
+    if (!/\d/.test(password)) return { status: 'error', message: 'La contraseña nueva debe contener al menos un número.' };
+
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_USUARIOS);
+    if (!sheet) return { status: 'error', message: 'Hoja de usuarios no encontrada.' };
+
+    var values = sheet.getDataRange().getValues();
+    var usuario = String(data.usuario).trim().toLowerCase();
+    var hashActual = hashPasswordAppsScript(String(data.passwordActual));
+
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).toLowerCase() === usuario) {
+            var storedHash = String(values[i][1]);
+            if (storedHash !== hashActual && storedHash.trim() !== hashActual) {
+                return { status: 'error', message: 'La contraseña actual es incorrecta.' };
+            }
+            var nuevoHash = hashPasswordAppsScript(String(data.passwordNueva));
+            sheet.getRange(i + 1, 2).setValue(nuevoHash);
+            return { status: 'success', message: 'Contraseña actualizada correctamente.' };
+        }
+    }
+    return { status: 'error', message: 'Usuario no encontrado.' };
+}
+
+/**
+ * Reset de contraseña por un administrador.
+ * Requiere: { usuario, passwordNueva, adminKey }
+ */
+function resetPassword(data) {
+    if (!data || !data.usuario || !data.passwordNueva || !data.adminKey) {
+        return { status: 'error', message: 'Faltan parámetros.' };
+    }
+
+    var storedKey = getAdminKey();
+    if (!storedKey) return { status: 'error', message: 'ADMIN_KEY no configurada.' };
+    if (String(data.adminKey) !== storedKey) return { status: 'error', message: 'Clave admin inválida.' };
+
+    var password = String(data.passwordNueva);
+    if (password.length < 6) return { status: 'error', message: 'La contraseña nueva debe tener al menos 6 caracteres.' };
+    if (!/\d/.test(password)) return { status: 'error', message: 'La contraseña nueva debe contener al menos un número.' };
+
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_USUARIOS);
+    if (!sheet) return { status: 'error', message: 'Hoja de usuarios no encontrada.' };
+
+    var values = sheet.getDataRange().getValues();
+    var usuario = String(data.usuario).trim().toLowerCase();
+
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).toLowerCase() === usuario) {
+            var nuevoHash = hashPasswordAppsScript(password);
+            sheet.getRange(i + 1, 2).setValue(nuevoHash);
+            return { status: 'success', message: 'Contraseña de \'' + data.usuario + '\' reseteada correctamente.' };
+        }
+    }
+    return { status: 'error', message: 'Usuario no encontrado.' };
+}
+
+// ======================================================================
+// GESTIÓN DE PEDIDOS (Estados: borrador → confirmado → completado)
+// ======================================================================
+
+function getPedidos(params) {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!sheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada. Inicialice la BD.' };
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'success', data: [] };
+    var headers = data[0];
+    var result = [];
+    for (var i = 1; i < data.length; i++) {
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+            row[headers[j]] = data[i][j];
+        }
+        // Filtrar por tipo si se proporciona
+        if (params && params.tipo && String(row.tipo).toLowerCase() !== String(params.tipo).toLowerCase()) continue;
+        // Filtrar por estado
+        if (params && params.estado && String(row.estado).toLowerCase() !== String(params.estado).toLowerCase()) continue;
+        result.push(row);
+    }
+    // Ordenar por fecha más reciente
+    result.sort(function (a, b) { return new Date(b.fecha_creacion) - new Date(a.fecha_creacion); });
+    return { status: 'success', data: result };
+}
+
+function getDetallePedido(params) {
+    if (!params || !params.pedidoId || !params.tipo) {
+        return { status: 'error', message: 'Faltan parámetros: pedidoId o tipo.' };
+    }
+    var isCompra = String(params.tipo).toLowerCase() === 'compra';
+    var sheetName = isCompra ? HOJA_COMPRAS : HOJA_VENTAS;
+    var ss = getSpreadsheet();
+    var detailSheet = ss.getSheetByName(sheetName);
+    if (!detailSheet) return { status: 'error', message: 'Hoja de detalles no encontrada.' };
+
+    var data = detailSheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'success', data: [] };
+
+    var headers = data[0];
+    var result = [];
+    var targetId = String(params.pedidoId).trim();
+
+    for (var i = 1; i < data.length; i++) {
+        var rowIdCol = data[i].length > 6 ? String(data[i][6]).trim() : '';
+        if (rowIdCol === targetId) {
+            var rowObj = {};
+            for (var j = 0; j < headers.length; j++) {
+                rowObj[headers[j]] = data[i][j];
+            }
+            result.push(rowObj);
+        }
+    }
+    return { status: 'success', data: result };
+}
+
+/**
+ * Crea un pedido en estado borrador (sin afectar inventario).
+ * data: { tipo, contacto, fecha, notas, metodo_pago, descuento, total, usuario, items: [...] }
+ */
+function crearPedido(data) {
+    if (!data || !data.tipo || !data.items || data.items.length === 0) {
+        return { status: 'error', message: 'Faltan datos del pedido o no tiene productos.' };
+    }
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada. Inicialice la BD.' };
+
+    var prefix = data.tipo === 'compra' ? 'P-' : 'V-';
+    // Generar ID secuencial
+    var lastRow = pedidosSheet.getLastRow();
+    var nextNum = 1;
+    if (lastRow >= 2) {
+        var ids = pedidosSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+        for (var i = 0; i < ids.length; i++) {
+            var num = parseInt(String(ids[i][0]).replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(num) && num >= nextNum) nextNum = num + 1;
+        }
+    }
+    var pedidoId = prefix + nextNum;
+    var now = new Date();
+
+    // Guardar encabezado del pedido
+    pedidosSheet.appendRow([
+        pedidoId,
+        data.tipo,
+        'borrador',
+        data.contacto || '',
+        data.fecha ? new Date(data.fecha) : now,
+        data.notas || '',
+        data.metodo_pago || '',
+        parseFloat(data.descuento || 0),
+        parseFloat(data.total || 0),
+        data.usuario || '',
+        now,
+        now
+    ]);
+
+    // Guardar líneas de detalle en la hoja de Compras/Ventas (sin afectar stock aún)
+    var isCompra = data.tipo === 'compra';
+    var detailSheet = ss.getSheetByName(isCompra ? HOJA_COMPRAS : HOJA_VENTAS);
+    if (detailSheet) {
+        for (var j = 0; j < data.items.length; j++) {
+            var item = data.items[j];
+            var fechaTx = data.fecha ? new Date(data.fecha) : now;
+            detailSheet.appendRow([
+                generateUniqueAppId(),
+                item.producto_id,
+                parseInt(item.cantidad),
+                parseFloat(item.precio),
+                fechaTx,
+                data.contacto || '',
+                pedidoId
+            ]);
+        }
+    }
+
+    return { status: 'success', message: 'Pedido ' + pedidoId + ' creado como borrador.', pedidoId: pedidoId };
+}
+
+/**
+ * Actualiza un pedido en estado borrador.
+ */
+function actualizarPedido(data) {
+    if (!data || !data.pedidoId || !data.tipo || !data.items || data.items.length === 0) {
+        return { status: 'error', message: 'Faltan datos del pedido o no tiene productos.' };
+    }
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada.' };
+
+    var values = pedidosSheet.getDataRange().getValues();
+    var targetId = String(data.pedidoId).trim();
+    var pedidoRow = -1;
+
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            pedidoRow = i + 1;
+            var estadoActual = String(values[i][2]);
+            if (estadoActual !== 'borrador') {
+                return { status: 'error', message: 'Solo se pueden actualizar pedidos en estado borrador.' };
+            }
+            break;
+        }
+    }
+
+    if (pedidoRow === -1) return { status: 'error', message: 'Pedido no encontrado.' };
+
+    var now = new Date();
+    // Actualizar encabezado
+    pedidosSheet.getRange(pedidoRow, 4).setValue(data.contacto || '');
+    if (data.fecha) pedidosSheet.getRange(pedidoRow, 5).setValue(new Date(data.fecha));
+    pedidosSheet.getRange(pedidoRow, 6).setValue(data.notas || '');
+    pedidosSheet.getRange(pedidoRow, 7).setValue(data.metodo_pago || '');
+    pedidosSheet.getRange(pedidoRow, 8).setValue(parseFloat(data.descuento || 0));
+    pedidosSheet.getRange(pedidoRow, 9).setValue(parseFloat(data.total || 0));
+    if (data.usuario) pedidosSheet.getRange(pedidoRow, 10).setValue(data.usuario);
+    pedidosSheet.getRange(pedidoRow, 12).setValue(now);
+
+    // Reemplazar detalles
+    var isCompra = data.tipo === 'compra';
+    var detailSheet = ss.getSheetByName(isCompra ? HOJA_COMPRAS : HOJA_VENTAS);
+    if (detailSheet) {
+        var detailValues = detailSheet.getDataRange().getValues();
+        // Borrar actuales interando de abajo hacia arriba
+        for (var i = detailValues.length - 1; i >= 1; i--) {
+            var rowIdCol = detailValues[i].length > 6 ? String(detailValues[i][6]).trim() : '';
+            if (rowIdCol === targetId) {
+                detailSheet.deleteRow(i + 1);
+            }
+        }
+
+        // Insertar nuevos
+        for (var j = 0; j < data.items.length; j++) {
+            var item = data.items[j];
+            var fechaTx = data.fecha ? new Date(data.fecha) : now;
+            detailSheet.appendRow([
+                generateUniqueAppId(),
+                item.producto_id,
+                parseInt(item.cantidad),
+                parseFloat(item.precio),
+                fechaTx,
+                data.contacto || '',
+                targetId
+            ]);
+        }
+    }
+
+    return { status: 'success', message: 'Pedido ' + targetId + ' actualizado correctamente.', pedidoId: targetId };
+}
+
+/**
+ * Confirma un pedido borrador → actualiza stock.
+ */
+function confirmarPedido(data) {
+    if (!data || !data.pedidoId) return { status: 'error', message: 'Falta pedidoId.' };
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada.' };
+
+    var values = pedidosSheet.getDataRange().getValues();
+    var targetId = String(data.pedidoId).trim();
+    var pedidoRow = -1;
+    var pedidoData = null;
+
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            pedidoRow = i + 1;
+            pedidoData = values[i];
+            break;
+        }
+    }
+    if (pedidoRow === -1) return { status: 'error', message: 'Pedido no encontrado.' };
+    if (String(pedidoData[2]) !== 'borrador') return { status: 'error', message: 'Solo se pueden confirmar pedidos en estado borrador. Estado actual: ' + pedidoData[2] };
+
+    var isCompra = String(pedidoData[1]) === 'compra';
+
+    // Obtener líneas de detalle del pedido
+    var detailSheet = ss.getSheetByName(isCompra ? HOJA_COMPRAS : HOJA_VENTAS);
+    var prodSheet = ss.getSheetByName(HOJA_PRODUCTOS);
+    if (!detailSheet || !prodSheet) return { status: 'error', message: 'Hojas requeridas no encontradas.' };
+
+    var detailValues = detailSheet.getDataRange().getValues();
+    var prodValues = prodSheet.getDataRange().getValues();
+    var errors = [];
+
+    // Para cada línea del pedido, actualizar stock
+    for (var d = 1; d < detailValues.length; d++) {
+        var pedidoIdCol = detailValues[d].length > 6 ? String(detailValues[d][6]).trim() : '';
+        if (pedidoIdCol !== targetId) continue;
+
+        var prodId = String(detailValues[d][1]).trim();
+        var cantidad = parseInt(detailValues[d][2]) || 0;
+
+        // Buscar producto
+        for (var p = 1; p < prodValues.length; p++) {
+            if (String(prodValues[p][0]).trim() === prodId) {
+                var tipoProducto = prodValues[p][4] || 'Inventariable';
+                if (tipoProducto === 'Inventariable') {
+                    var stockActual = parseInt(prodValues[p][7]) || 0;
+                    var nuevoStock;
+                    if (isCompra) {
+                        nuevoStock = stockActual + cantidad;
+                    } else {
+                        if (stockActual < cantidad) {
+                            errors.push(prodValues[p][1] + ': stock insuficiente (' + stockActual + ' disponibles, ' + cantidad + ' requeridos)');
+                            break;
+                        }
+                        nuevoStock = stockActual - cantidad;
+                    }
+                    prodSheet.getRange(p + 1, 8).setValue(nuevoStock);
+                    prodValues[p][7] = nuevoStock; // actualizar cache local
+                }
+                break;
+            }
+        }
+    }
+
+    if (errors.length > 0) {
+        return { status: 'error', message: 'No se pudo confirmar: ' + errors.join('; ') };
+    }
+
+    // Actualizar estado
+    pedidosSheet.getRange(pedidoRow, 3).setValue('confirmado');
+    pedidosSheet.getRange(pedidoRow, 12).setValue(new Date());
+    return { status: 'success', message: 'Pedido ' + targetId + ' confirmado. Stock actualizado.' };
+}
+
+/**
+ * Marca un pedido confirmado como completado.
+ */
+function completarPedido(data) {
+    if (!data || !data.pedidoId) return { status: 'error', message: 'Falta pedidoId.' };
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja no encontrada.' };
+    var values = pedidosSheet.getDataRange().getValues();
+    var targetId = String(data.pedidoId).trim();
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            if (String(values[i][2]) !== 'confirmado') return { status: 'error', message: 'Solo se pueden completar pedidos confirmados.' };
+            pedidosSheet.getRange(i + 1, 3).setValue('completado');
+            pedidosSheet.getRange(i + 1, 12).setValue(new Date());
+            return { status: 'success', message: 'Pedido ' + targetId + ' completado.' };
+        }
+    }
+    return { status: 'error', message: 'Pedido no encontrado.' };
+}
+
+// ======================================================================
+// SISTEMA CHATTER / LOG DE ACTIVIDAD
+// ======================================================================
+
+/**
+ * Obtiene o crea la hoja Log y retorna su objeto.
+ */
+function getOrCreateLogSheet() {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_LOG);
+    if (!sheet) {
+        sheet = ss.insertSheet(HOJA_LOG);
+        sheet.appendRow(LOG_HEADERS);
+        sheet.getRange(1, 1, 1, LOG_HEADERS.length)
+            .setFontWeight('bold')
+            .setBackground('#1a1a2e')
+            .setFontColor('#ffffff');
+        sheet.setFrozenRows(1);
+    }
+    return sheet;
+}
+
+/**
+ * Agrega un mensaje/evento al log de actividad de un pedido.
+ * @param {Object} data - { referenciaId, modulo, tipo, mensaje, usuario }
+ *   - referenciaId: ID del pedido u otro objeto
+ *   - modulo: "pedido" | "contacto" | ...
+ *   - tipo: "nota" | "sistema" | "cambio_estado"
+ *   - mensaje: texto libre
+ *   - usuario: nombre del usuario que genera el evento
+ */
+function addChatMessage(data) {
+    if (!data || !data.referenciaId || !data.mensaje) {
+        return { status: 'error', message: 'Faltan parámetros: referenciaId o mensaje.' };
+    }
+    try {
+        var sheet = getOrCreateLogSheet();
+        var id = generateUniqueAppId();
+        var fecha = new Date();
+        sheet.appendRow([
+            id,
+            String(data.referenciaId).trim(),
+            data.modulo || 'pedido',
+            data.tipo || 'nota',
+            String(data.mensaje).trim(),
+            String(data.usuario || 'Sistema').trim(),
+            fecha
+        ]);
+        return { status: 'success', logId: id, fecha: fecha.toISOString() };
+    } catch (e) {
+        return { status: 'error', message: 'Error al guardar el mensaje: ' + e.message };
+    }
+}
+
+/**
+ * Obtiene todos los mensajes/eventos del chatter para una referencia.
+ * @param {Object} params - { referenciaId, modulo? }
+ */
+function getChatter(params) {
+    if (!params || !params.referenciaId) {
+        return { status: 'error', message: 'Falta referenciaId.' };
+    }
+    try {
+        var sheet = getOrCreateLogSheet();
+        var data = sheet.getDataRange().getValues();
+        if (data.length < 2) return { status: 'success', data: [] };
+
+        var headers = data[0];
+        var targetId = String(params.referenciaId).trim();
+        var modulo = params.modulo || null;
+        var result = [];
+
+        for (var i = 1; i < data.length; i++) {
+            var row = {};
+            for (var j = 0; j < headers.length; j++) {
+                row[headers[j]] = data[i][j];
+            }
+            if (String(row.referencia_id).trim() !== targetId) continue;
+            if (modulo && String(row.modulo).toLowerCase() !== modulo) continue;
+            // Serializar fecha
+            if (row.fecha instanceof Date) row.fecha = row.fecha.toISOString();
+            result.push(row);
+        }
+
+        // Ordenar más reciente al final (cronológico)
+        result.sort(function (a, b) { return new Date(a.fecha) - new Date(b.fecha); });
+        return { status: 'success', data: result };
+    } catch (e) {
+        return { status: 'error', message: 'Error al obtener el log: ' + e.message };
+    }
+}
+/**
+ * Cancela un pedido. Si estaba confirmado, revierte stock.
+ */
+function cancelarPedido(data) {
+    if (!data || !data.pedidoId) return { status: 'error', message: 'Falta pedidoId.' };
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja no encontrada.' };
+    var values = pedidosSheet.getDataRange().getValues();
+    var targetId = String(data.pedidoId).trim();
+
+    for (var i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim() === targetId) {
+            var estadoActual = String(values[i][2]);
+            if (estadoActual === 'completado') return { status: 'error', message: 'No se puede cancelar un pedido ya completado.' };
+            if (estadoActual === 'cancelado') return { status: 'error', message: 'Pedido ya está cancelado.' };
+
+            // Si estaba confirmado, revertir stock
+            if (estadoActual === 'confirmado') {
+                var isCompra = String(values[i][1]) === 'compra';
+                var detailSheet = ss.getSheetByName(isCompra ? HOJA_COMPRAS : HOJA_VENTAS);
+                var prodSheet = ss.getSheetByName(HOJA_PRODUCTOS);
+                if (detailSheet && prodSheet) {
+                    var detailValues = detailSheet.getDataRange().getValues();
+                    var prodValues = prodSheet.getDataRange().getValues();
+                    for (var d = 1; d < detailValues.length; d++) {
+                        var pedidoIdCol = detailValues[d].length > 6 ? String(detailValues[d][6]).trim() : '';
+                        if (pedidoIdCol !== targetId) continue;
+                        var prodId = String(detailValues[d][1]).trim();
+                        var cantidad = parseInt(detailValues[d][2]) || 0;
+                        for (var p = 1; p < prodValues.length; p++) {
+                            if (String(prodValues[p][0]).trim() === prodId) {
+                                var tipoProducto = prodValues[p][4] || 'Inventariable';
+                                if (tipoProducto === 'Inventariable') {
+                                    var stockActual = parseInt(prodValues[p][7]) || 0;
+                                    // Revertir: compra restaba, venta sumaba
+                                    var nuevoStock = isCompra ? stockActual - cantidad : stockActual + cantidad;
+                                    prodSheet.getRange(p + 1, 8).setValue(Math.max(0, nuevoStock));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            pedidosSheet.getRange(i + 1, 3).setValue('cancelado');
+            pedidosSheet.getRange(i + 1, 12).setValue(new Date());
+            return { status: 'success', message: 'Pedido ' + targetId + ' cancelado.' + (estadoActual === 'confirmado' ? ' Stock revertido.' : '') };
+        }
+    }
+    return { status: 'error', message: 'Pedido no encontrado.' };
 }
