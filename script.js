@@ -1601,7 +1601,7 @@ function openNewOrderModal(tipo) {
     document.getElementById('newOrd_metodo_pago').value = '';
     document.getElementById('newOrd_descuento').value = 0;
     document.getElementById('newOrd_notas').value = '';
-    document.getElementById('newOrd_apply_iva').checked = true;
+    document.getElementById('newOrd_apply_iva').checked = false; // IVA desactivado por defecto
     const statusEl = document.getElementById('newOrd_status');
     if (statusEl) statusEl.style.display = 'none';
     document.getElementById('newOrd_items_body').innerHTML = '';
@@ -1612,8 +1612,14 @@ function openNewOrderModal(tipo) {
     document.getElementById('newOrd_apply_iva').onchange = newOrdCalcTotals;
     document.getElementById('newOrd_draft_btn').onclick = () => newOrdSubmit('borrador');
     document.getElementById('newOrd_confirm_btn').onclick = () => newOrdSubmit('confirmar');
+
+    // Botón de cotización: solo visible para ventas
+    const emailBtn = document.getElementById('newOrd_email_btn');
+    if (emailBtn) emailBtn.style.display = isCompra ? 'none' : 'inline-flex';
+
     openModal('modalNewOrder');
 }
+
 
 function newOrdAddLine() {
     const tbody = document.getElementById('newOrd_items_body');
@@ -1706,10 +1712,24 @@ async function newOrdSubmit(mode) {
                 const res2 = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'confirmarPedido', pedidoId }) });
                 const data2 = await res2.json();
                 showToast(data2.status === 'success' ? `Pedido ${pedidoId} confirmado.` : data2.message, data2.status === 'success' ? 'success' : 'warning');
-            } else { showToast(`Borrador ${pedidoId} guardado.`, 'success'); }
-            closeModal('modalNewOrder');
-            loadOrdersByType(newOrdTipo);
-            loadPedidos();
+                closeModal('modalNewOrder');
+                loadOrdersByType(newOrdTipo);
+                loadPedidos();
+            } else {
+                // Borrador guardado: mantener el modal abierto para poder enviar la cotización
+                newOrdLastPedidoId = pedidoId;
+                showToast(`Borrador ${pedidoId} guardado.`, 'success');
+                statusEl.className = 'status-message success';
+                statusEl.textContent = `✓ Borrador ${pedidoId} guardado. Puedes enviarlo como cotización o cerrar.`;
+                // Mostrar botón de email si es venta
+                if (newOrdTipo === 'venta') {
+                    const eb = document.getElementById('newOrd_email_btn');
+                    if (eb) eb.style.display = 'inline-flex';
+                }
+                loadOrdersByType(newOrdTipo);
+                loadPedidos();
+            }
+
         } else {
             statusEl.className = 'status-message error'; statusEl.textContent = data.message;
         }
@@ -2050,7 +2070,7 @@ async function openOrderDetails(pedidoId, tipo) {
     document.getElementById('mord_notas').disabled = !esBorrador;
     document.getElementById('mord_descuento').value = pedido.descuento || 0;
     document.getElementById('mord_descuento').disabled = !esBorrador;
-    document.getElementById('mord_apply_iva').checked = true;
+    document.getElementById('mord_apply_iva').checked = false;
     document.getElementById('mord_apply_iva').disabled = !esBorrador;
 
     // Mostrar/ocultar botones de acciones
@@ -2059,11 +2079,17 @@ async function openOrderDetails(pedidoId, tipo) {
     document.getElementById('mord_complete_btn').style.display = estadoNorm === 'confirmado' ? '' : 'none';
     document.getElementById('mord_cancel_btn').style.display = (isActive && estadoNorm !== 'completado') ? '' : 'none';
     document.getElementById('mord_add_line_wrapper').style.display = esBorrador ? '' : 'none';
+    // El botón email se asigna después de openModal (ver más abajo)
 
     // Cargar líneas de detalle
     const tbody = document.getElementById('mord_items_body');
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando productos...</td></tr>';
     openModal('modalOrderDetails');
+
+    // Botón email: se asigna DESPUÉS de openModal para no ser sobreescrito
+    // Visible para todos los estados (borrador = cotización, confirmado/completado = factura)
+    const emailBtn = document.getElementById('mord_email_btn');
+    if (emailBtn) emailBtn.style.display = estadoNorm !== 'cancelado' ? 'inline-flex' : 'none';
 
     try {
         const res = await fetch(`${SCRIPT_URL}?action=getDetallePedido&pedidoId=${encodeURIComponent(pedidoId)}&tipo=${tipo}`);
@@ -2179,11 +2205,11 @@ function mordAddLine(isCompra, prodId = '', prodName = '', qty = 1, precio = 0) 
             <td><i class="fas fa-trash mord-remove-line" style="cursor:pointer; color:var(--danger-color);"></i></td>
         `;
     } else {
-        // Modo solo lectura
+        // Modo solo lectura — incluye data-qty y data-price para que mordCalcTotals pueda leerlos
         row.innerHTML = `
             <td>${prodName || prodId}</td>
-            <td>${qty}</td>
-            <td>${formatCOP(precio)}</td>
+            <td data-qty="${qty}">${qty}</td>
+            <td data-price="${precio}">${formatCOP(precio)}</td>
             <td>${formatCOP(qty * precio)}</td>
             <td></td>
         `;
@@ -2223,9 +2249,18 @@ function mordCalcTotals() {
         const priceEl = row.querySelector('.mord-item-price');
         const subtotalEl = row.querySelector('.mord-item-subtotal');
         if (qtyEl && priceEl) {
+            // Modo edición: leer desde inputs
             const line = (parseFloat(qtyEl.value) || 0) * (parseFloat(priceEl.value) || 0);
             if (subtotalEl) subtotalEl.textContent = formatCOP(line);
             subtotal += line;
+        } else {
+            // Modo lectura: leer desde data-attributes en los TD
+            const qtyTd = row.querySelector('td[data-qty]');
+            const priceTd = row.querySelector('td[data-price]');
+            if (qtyTd && priceTd) {
+                const line = (parseFloat(qtyTd.dataset.qty) || 0) * (parseFloat(priceTd.dataset.price) || 0);
+                subtotal += line;
+            }
         }
     });
 
@@ -2486,4 +2521,235 @@ function exportDataToExcel(data, fileName, sheetName = "Sheet1") {
     const fullFileName = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fullFileName);
     showToast(`Archivo generado: ${fullFileName}`, "success");
+}
+
+// ========== ENVÍO DE CORREO — FACTURA / COTIZACIÓN ==========
+
+// Variables de contexto del email modal
+let emailCurrentPedidoId = null;
+let emailCurrentTipo = null;
+let emailCurrentEstado = null;
+let emailCurrentContacto = null;
+let newOrdLastPedidoId = null; // ID del último borrador guardado desde nueva orden
+
+/**
+ * Abre el modal de envío de correo con los datos del pedido actual.
+ * Se llama desde el botón "Enviar por Correo" en el modal de detalle.
+ */
+function openEmailModal() {
+    try {
+        // ── 1. Obtener el ID del pedido activo ───────────────────────
+        emailCurrentPedidoId = chatterCurrentRef || null;
+        if (!emailCurrentPedidoId) {
+            showToast('No hay ningún pedido abierto para enviar.', 'warning');
+            return;
+        }
+
+        // ── 2. Leer estado del pedido desde el pipeline visual ───────
+        //    Buscamos el paso activo en el pipeline (tiene clase 'active')
+        const pipelineSteps = ['borrador', 'confirmado', 'completado', 'cancelado'];
+        let estadoDetectado = '';
+        for (const s of pipelineSteps) {
+            const el = document.getElementById('pipe_' + s);
+            if (el && el.classList.contains('active')) { estadoDetectado = s; break; }
+        }
+        emailCurrentEstado = estadoDetectado;
+
+        // ── 3. Determinar tipo (compra/venta) desde el título del modal
+        //    El h3 con id modal_order_title contiene "Pedido de Compra/Venta"
+        const titleEl = document.getElementById('modal_order_title');
+        const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
+        emailCurrentTipo = titleText.includes('compra') ? 'compra' : 'venta';
+
+        // Fallback: leer el ID del pedido desde el label visible si chatterCurrentRef es null
+        if (!emailCurrentPedidoId) {
+            const idLabel = document.getElementById('modal_order_id_label');
+            emailCurrentPedidoId = idLabel ? idLabel.textContent.trim() : null;
+            if (!emailCurrentPedidoId) {
+                showToast('No se pudo identificar el pedido. Intenta abrirlo de nuevo.', 'warning');
+                return;
+            }
+        }
+
+
+        // ── 4. Contacto desde el select (puede estar disabled) ───────
+        const contactoEl = document.getElementById('mord_contacto');
+        if (contactoEl) {
+            const idx = contactoEl.selectedIndex;
+            emailCurrentContacto = (idx >= 0 && contactoEl.options[idx])
+                ? contactoEl.options[idx].text
+                : contactoEl.value || '';
+        } else {
+            emailCurrentContacto = '';
+        }
+
+        // ── 5. Tipo de documento según estado ────────────────────────
+        const esCotizacion = emailCurrentEstado === 'borrador';
+        const tipoDoc = esCotizacion ? 'Cotización' : 'Factura';
+        const tipoLabel = emailCurrentTipo === 'compra' ? 'Compra' : 'Venta';
+
+        // ── 6. Actualizar preview del modal de correo ─────────────────
+        const docType = document.getElementById('email_doc_type');
+        const docRef = document.getElementById('email_doc_ref');
+        if (docType) docType.textContent = `${tipoDoc} — Orden de ${tipoLabel}`;
+        if (docRef) docRef.textContent = `Ref: ${emailCurrentPedidoId} · ${emailCurrentContacto || '—'}`;
+
+        // ── 7. Limpiar campos ─────────────────────────────────────────
+        const destEl = document.getElementById('email_destinatario');
+        const ccEl = document.getElementById('email_cc');
+        const asuntoEl = document.getElementById('email_asunto');
+        const statusEl = document.getElementById('email_status');
+        if (destEl) { destEl.value = ''; destEl.style.borderColor = ''; }
+        if (ccEl) { ccEl.value = ''; ccEl.style.borderColor = ''; }
+        if (asuntoEl) asuntoEl.value = '';
+        if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+
+        // ── 8. Mostrar modal de correo ────────────────────────────────
+        // Moverlo al último hijo de body garantiza que siempre esté
+        // sobre cualquier otro modal, sin depender de z-index ni stacking contexts.
+        const modal = document.getElementById('modalEmail');
+        if (!modal) { showToast('Error: modal de correo no encontrado.', 'error'); return; }
+        document.body.appendChild(modal); // reubica al tope del DOM
+        modal.style.zIndex = '9999';
+        modal.style.display = 'flex';
+        setTimeout(() => { if (destEl) destEl.focus(); }, 120);
+
+
+    } catch (err) {
+        showToast('Error al abrir el modal de correo: ' + err.message, 'error');
+        console.error('[openEmailModal]', err);
+    }
+}
+
+
+function closeEmailModal() {
+    const modal = document.getElementById('modalEmail');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Abre el modal de correo desde el formulario de nueva venta.
+ * Usa el pedidoId del último borrador guardado (newOrdLastPedidoId).
+ */
+function openEmailModalFromNew() {
+    if (!newOrdLastPedidoId) {
+        showToast('Primero guarda el borrador para poder enviar la cotización.', 'warning');
+        return;
+    }
+
+    // Configurar contexto del email
+    emailCurrentPedidoId = newOrdLastPedidoId;
+    emailCurrentTipo = 'venta';
+    emailCurrentEstado = 'borrador';
+
+    // Leer contacto del formulario activo
+    const contactoEl = document.getElementById('newOrd_contacto');
+    emailCurrentContacto = contactoEl ? (contactoEl.options[contactoEl.selectedIndex]?.text || '') : '';
+
+    // Actualizar el preview en el modal de correo
+    const docType = document.getElementById('email_doc_type');
+    const docRef = document.getElementById('email_doc_ref');
+    if (docType) docType.textContent = 'Cotización — Venta';
+    if (docRef) docRef.textContent = `Ref: ${emailCurrentPedidoId} · ${emailCurrentContacto || '—'}`;
+
+    // Limpiar campos anteriores
+    const destEl = document.getElementById('email_destinatario');
+    const ccEl = document.getElementById('email_cc');
+    const asuntoEl = document.getElementById('email_asunto');
+    const statusEl = document.getElementById('email_status');
+    if (destEl) { destEl.value = ''; destEl.style.borderColor = ''; }
+    if (ccEl) { ccEl.value = ''; ccEl.style.borderColor = ''; }
+    if (asuntoEl) asuntoEl.value = '';
+    if (statusEl) { statusEl.style.display = 'none'; }
+
+    // Abrir modal de correo — moverlo al tope del DOM para garantizar que
+    // aparezca encima de cualquier overlay activo
+    const modal = document.getElementById('modalEmail');
+    if (modal) {
+        document.body.appendChild(modal);
+        modal.style.zIndex = '9999';
+        modal.style.display = 'flex';
+        setTimeout(() => { if (destEl) destEl.focus(); }, 100);
+    }
+}
+
+/**
+ * Envía el correo llamando al backend GAS.
+ */
+async function submitSendEmail() {
+    const destEl = document.getElementById('email_destinatario');
+    const asuntoEl = document.getElementById('email_asunto');
+    const statusEl = document.getElementById('email_status');
+    const sendBtn = document.getElementById('email_send_btn');
+
+    const destinatario = (destEl?.value || '').trim();
+    if (!destinatario) {
+        showEmailStatus('Escribe el correo del destinatario.', 'error');
+        destEl?.focus();
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destinatario)) {
+        showEmailStatus('El correo no tiene un formato válido.', 'error');
+        destEl?.focus();
+        return;
+    }
+    if (!emailCurrentPedidoId) {
+        showEmailStatus('No hay pedido seleccionado.', 'error');
+        return;
+    }
+
+    // Deshabilitar botón y mostrar spinner
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Enviando...'; }
+    showEmailStatus('Generando y enviando...', 'info');
+
+    let usuario = '';
+    try { usuario = window.InvAuth?.currentUser?.()?.usuario || 'Usuario'; } catch (e) { }
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'enviarCorreoPedido',
+                pedidoId: emailCurrentPedidoId,
+                destinatario,
+                cc: document.getElementById('email_cc')?.value?.trim() || '',
+                asunto: asuntoEl?.value?.trim() || '',
+                tipo: emailCurrentTipo,
+                usuario
+            })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showEmailStatus('✓ ' + data.message, 'success');
+            showToast(data.message, 'success');
+            // Recargar chatter para ver el registro del envío
+            if (chatterCurrentRef) loadChatter(chatterCurrentRef);
+            // Cerrar modal tras 2s
+            setTimeout(closeEmailModal, 2000);
+        } else {
+            showEmailStatus('✗ ' + data.message, 'error');
+        }
+    } catch (e) {
+        showEmailStatus('Error de conexión: ' + e.message, 'error');
+    } finally {
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar'; }
+    }
+}
+
+function showEmailStatus(msg, type) {
+    const el = document.getElementById('email_status');
+    if (!el) return;
+    const styles = {
+        success: { bg: '#dcfce7', color: '#166534', border: '#22c55e' },
+        error: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' },
+        info: { bg: '#dbeafe', color: '#1e40af', border: '#3b82f6' }
+    };
+    const s = styles[type] || styles.info;
+    el.style.display = 'block';
+    el.style.background = s.bg;
+    el.style.color = s.color;
+    el.style.borderColor = s.border;
+    el.textContent = msg;
 }

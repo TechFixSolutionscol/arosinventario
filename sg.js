@@ -155,6 +155,8 @@ function doPost(e) {
             result = resetPassword(requestData);
         } else if (action === 'addChatMessage') {
             result = addChatMessage(requestData);
+        } else if (action === 'enviarCorreoPedido') {
+            result = enviarCorreoPedido(requestData);
         } else {
             result = { status: "error", message: "Acción POST no reconocida." };
         }
@@ -1563,4 +1565,309 @@ function cancelarPedido(data) {
         }
     }
     return { status: 'error', message: 'Pedido no encontrado.' };
+}
+
+// ======================================================================
+// ENVÍO DE CORREO — FACTURA / COTIZACIÓN (GmailApp)
+// ======================================================================
+
+/**
+ * Envía por correo la factura o cotización de un pedido.
+ * @param {Object} data { pedidoId, destinatario, asunto?, tipo, usuario? }
+ */
+function enviarCorreoPedido(data) {
+    if (!data || !data.pedidoId || !data.destinatario) {
+        return { status: 'error', message: 'Faltan parámetros: pedidoId o destinatario.' };
+    }
+
+    // 1. Validar email
+    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.destinatario)) {
+        return { status: 'error', message: 'El correo destinatario no es válido.' };
+    }
+
+    // 2. Obtener cabecera del pedido
+    var ss = getSpreadsheet();
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada.' };
+
+    var pedidosData = pedidosSheet.getDataRange().getValues();
+    var pedidosHdr = pedidosData[0];
+    var pedido = null;
+    var targetId = String(data.pedidoId).trim();
+
+    for (var i = 1; i < pedidosData.length; i++) {
+        if (String(pedidosData[i][0]).trim() === targetId) {
+            pedido = {};
+            for (var h = 0; h < pedidosHdr.length; h++) pedido[pedidosHdr[h]] = pedidosData[i][h];
+            break;
+        }
+    }
+    if (!pedido) return { status: 'error', message: 'Pedido ' + targetId + ' no encontrado.' };
+
+    var isCompra = String(pedido.tipo).toLowerCase() === 'compra';
+    var estado = String(pedido.estado || '').toLowerCase();
+    var esCotizacion = estado === 'borrador';
+
+    // 3. Obtener líneas de detalle
+    var detailSheet = ss.getSheetByName(isCompra ? HOJA_COMPRAS : HOJA_VENTAS);
+    var lines = [];
+
+    if (detailSheet) {
+        var detailData = detailSheet.getDataRange().getValues();
+        var detailHdr = detailData[0];
+        var prodSheet = ss.getSheetByName(HOJA_PRODUCTOS);
+        var prodData = prodSheet ? prodSheet.getDataRange().getValues() : [];
+        var prodHdrArr = prodData.length ? prodData[0] : [];
+        var prodMap = {};
+        for (var p = 1; p < prodData.length; p++) {
+            var pr = {};
+            for (var ph = 0; ph < prodHdrArr.length; ph++) pr[prodHdrArr[ph]] = prodData[p][ph];
+            prodMap[String(pr.id)] = pr;
+        }
+        for (var d = 1; d < detailData.length; d++) {
+            var lr = {};
+            for (var lh = 0; lh < detailHdr.length; lh++) lr[detailHdr[lh]] = detailData[d][lh];
+            if (String(lr.pedido_id || '').trim() !== targetId) continue;
+            var pi = prodMap[String(lr.producto_id)] || {};
+            lines.push({
+                producto: pi.nombre || lr.producto_id || 'Producto',
+                codigo: pi['código'] || pi.codigo || '',
+                cantidad: parseInt(lr.cantidad) || 0,
+                precio: parseFloat(isCompra ? lr.precio_compra : lr.precio_venta) || 0
+            });
+        }
+    }
+
+    // 4. Calcular totales
+    var subtotal = lines.reduce(function (s, l) { return s + l.cantidad * l.precio; }, 0);
+    var descPct = parseFloat(pedido.descuento) || 0;
+    var descVal = subtotal * (descPct / 100);
+    var afterDesc = subtotal - descVal;
+    var ivaVal = afterDesc * 0.19;
+    var totalFinal = parseFloat(pedido.total) || (afterDesc + ivaVal);
+
+    // 5. Helpers de formato
+    function fmtFecha(f) {
+        if (!f) return '—';
+        var dt = f instanceof Date ? f : new Date(f);
+        if (isNaN(dt)) return String(f);
+        return dt.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+    }
+    function fmtCOP(n) {
+        return '$ ' + Number(n).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    // 6. Filas de la tabla HTML
+    var filas = lines.map(function (l) {
+        var sub = l.cantidad * l.precio;
+        return '<tr>' +
+            '<td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#1e293b;">' +
+            l.producto + (l.codigo ? '<br><small style="color:#94a3b8;font-size:0.78rem;">' + l.codigo + '</small>' : '') +
+            '</td>' +
+            '<td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;color:#1e293b;">' + l.cantidad + '</td>' +
+            '<td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:right;color:#1e293b;">' + fmtCOP(l.precio) + '</td>' +
+            '<td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;color:#1e293b;">' + fmtCOP(sub) + '</td>' +
+            '</tr>';
+    }).join('') || '<tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;font-style:italic;">Sin líneas de detalle.</td></tr>';
+
+    // 7. Tipo de documento y colores
+    var tipoDoc = esCotizacion ? 'COTIZACI\u00D3N' : 'FACTURA';
+    var docColor = esCotizacion ? '#f59e0b' : '#4361ee';
+    var tipoText = isCompra ? 'Orden de Compra' : 'Orden de Venta';
+    var estadoColors = {
+        borrador: { bg: '#f1f5f9', color: '#475569' },
+        confirmado: { bg: '#dbeafe', color: '#1d4ed8' },
+        completado: { bg: '#dcfce7', color: '#166534' },
+        cancelado: { bg: '#fee2e2', color: '#991b1b' }
+    };
+    var ec = estadoColors[estado] || estadoColors.borrador;
+
+    // 8. Filas de totales
+    var filasTotal =
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e2e8f0;font-size:0.875rem;color:#64748b;">' +
+        '<span>Base Imponible</span><span>' + fmtCOP(subtotal) + '</span></div>' +
+        (descPct > 0
+            ? '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e2e8f0;font-size:0.875rem;color:#ef4444;">' +
+            '<span>Descuento (' + descPct + '%)</span><span>- ' + fmtCOP(descVal) + '</span></div>'
+            : '') +
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e2e8f0;font-size:0.875rem;color:#64748b;">' +
+        '<span>IVA (19%)</span><span>' + fmtCOP(ivaVal) + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0 0;font-size:1.1rem;font-weight:800;color:#4361ee;">' +
+        '<span>TOTAL</span><span>' + fmtCOP(totalFinal) + '</span></div>';
+
+    // 9. HTML del correo
+    var htmlBody =
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+        '<body style="margin:0;padding:0;background:#f0f2f8;font-family:\'Segoe UI\',Arial,sans-serif;">' +
+        '<div style="max-width:680px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;' +
+        'box-shadow:0 8px 32px rgba(0,0,0,0.10);">' +
+
+        // — Header —
+        '<div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:32px 36px;">' +
+        '<table width="100%" cellpadding="0" cellspacing="0"><tr>' +
+        '<td><div style="font-size:1.8rem;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">' +
+        'Fix<span style="color:#818cf8;">Ops</span></div>' +
+        '<div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-top:3px;">TechFix Solutions</div></td>' +
+        '<td style="text-align:right;vertical-align:top;">' +
+        '<div style="display:inline-block;background:' + docColor + ';color:#fff;font-size:0.72rem;font-weight:800;' +
+        'letter-spacing:1.5px;padding:5px 14px;border-radius:20px;">' + tipoDoc + '</div>' +
+        '<div style="font-size:1.25rem;font-weight:800;color:#fff;margin-top:6px;">' + targetId + '</div>' +
+        '<div style="font-size:0.78rem;color:rgba(255,255,255,0.5);">' + tipoText + '</div>' +
+        '</td></tr></table></div>' +
+
+        // — Info cabecera —
+        '<div style="padding:22px 36px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">' +
+        '<table width="100%" cellpadding="0" cellspacing="0"><tr>' +
+        '<td style="width:33%;padding-right:12px;vertical-align:top;">' +
+        '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:4px;">' + (isCompra ? 'Proveedor' : 'Cliente') + '</div>' +
+        '<div style="font-size:0.95rem;font-weight:600;color:#1e293b;">' + (pedido.contacto || '—') + '</div></td>' +
+        '<td style="width:33%;padding-right:12px;vertical-align:top;">' +
+        '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:4px;">Fecha</div>' +
+        '<div style="font-size:0.95rem;font-weight:600;color:#1e293b;">' + fmtFecha(pedido.fecha) + '</div></td>' +
+        '<td style="width:33%;vertical-align:top;">' +
+        '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;margin-bottom:4px;">Estado</div>' +
+        '<div style="display:inline-block;font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;' +
+        'background:' + ec.bg + ';color:' + ec.color + ';">' + estado.toUpperCase() + '</div></td>' +
+        '</tr></table>' +
+        (pedido.metodo_pago ? '<div style="margin-top:10px;font-size:0.82rem;color:#64748b;"><strong>Método de pago:</strong> ' + pedido.metodo_pago + '</div>' : '') +
+        (pedido.notas ? '<div style="margin-top:5px;font-size:0.82rem;color:#64748b;"><strong>Notas:</strong> ' + String(pedido.notas) + '</div>' : '') +
+        '</div>' +
+
+        // — Tabla de productos —
+        '<div style="padding:28px 36px;">' +
+        '<table style="width:100%;border-collapse:collapse;">' +
+        '<thead><tr style="background:#f8fafc;">' +
+        '<th style="padding:10px 14px;text-align:left;font-size:0.72rem;font-weight:700;text-transform:uppercase;' +
+        'letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;">Producto</th>' +
+        '<th style="padding:10px 14px;text-align:center;font-size:0.72rem;font-weight:700;text-transform:uppercase;' +
+        'letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;">Cant.</th>' +
+        '<th style="padding:10px 14px;text-align:right;font-size:0.72rem;font-weight:700;text-transform:uppercase;' +
+        'letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;">Precio Unit.</th>' +
+        '<th style="padding:10px 14px;text-align:right;font-size:0.72rem;font-weight:700;text-transform:uppercase;' +
+        'letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;">Subtotal</th>' +
+        '</tr></thead><tbody>' + filas + '</tbody></table>' +
+
+        // — Totales —
+        '<div style="margin-top:20px;display:flex;justify-content:flex-end;">' +
+        '<div style="min-width:260px;background:#f8fafc;border-radius:12px;padding:18px 20px;border:1px solid #e2e8f0;">' +
+        filasTotal + '</div></div>' +
+        '</div>' +
+
+        // — Footer —
+        '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 36px;text-align:center;">' +
+        '<p style="font-size:0.78rem;color:#94a3b8;margin:0;">Generado automáticamente por <strong>FixOps</strong> &mdash; ' +
+        '<a href="https://techfixsolutions.site" style="color:#4361ee;text-decoration:none;">techfixsolutions.site</a></p>' +
+        '<p style="font-size:0.75rem;color:#cbd5e1;margin:5px 0 0;">' + fmtFecha(new Date()) + '</p>' +
+        '</div></div></body></html>';
+
+    // ── 10. Asunto ───────────────────────────────────────────────────
+    var asunto = (data.asunto && data.asunto.trim())
+        ? data.asunto.trim()
+        : tipoDoc + ' ' + targetId + ' \u2014 ' + (pedido.contacto || 'FixOps') + ' (' + fmtFecha(pedido.fecha) + ')';
+
+    // ── 11. Texto plano (fallback para clientes sin HTML) ────────────
+    var textPlano = tipoDoc + ' No. ' + targetId + '\n' +
+        tipoText + '\n' +
+        (isCompra ? 'Proveedor' : 'Cliente') + ': ' + (pedido.contacto || '\u2014') + '\n' +
+        'Fecha: ' + fmtFecha(pedido.fecha) + '\nEstado: ' + estado + '\nTotal: ' + fmtCOP(totalFinal) + '\n\n' +
+        'Para mejor visualizaci\u00f3n, abra este mensaje en un cliente compatible con HTML.';
+
+    // ── 12. Construir mensaje MIME multipart/alternative ─────────────
+    //   Siguiendo: https://developers.google.com/apps-script/advanced/gmail
+    //   Gmail.Users.Messages.send requiere el mensaje raw en base64url
+    var remitente = Session.getActiveUser().getEmail();
+    var boundary = 'fixops_' + Utilities.getUuid().replace(/-/g, '').substring(0, 20);
+
+    var mimeLines = [
+        'From: FixOps \u2014 TechFix Solutions <' + remitente + '>',
+        'To: ' + String(data.destinatario).trim()
+    ];
+    if (data.cc && String(data.cc).trim()) {
+        mimeLines.push('Cc: ' + String(data.cc).trim());
+    }
+    mimeLines = mimeLines.concat([
+        'Subject: =?UTF-8?B?' + Utilities.base64Encode(asunto, Utilities.Charset.UTF_8) + '?=',
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+        '',
+        '--' + boundary,
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: quoted-printable',
+        '',
+        textPlano,
+        '',
+        '--' + boundary,
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        Utilities.base64Encode(htmlBody, Utilities.Charset.UTF_8),
+        '',
+        '--' + boundary + '--'
+    ]);
+
+    // Codificar raw message en base64url (URL-safe, sin padding)
+    var rawMime = mimeLines.join('\r\n');
+    var base64url = Utilities.base64EncodeWebSafe(rawMime, Utilities.Charset.UTF_8)
+        .replace(/=+$/, '');
+
+    // ── 13. Enviar con Gmail Advanced Service ────────────────────────
+    //   IMPORTANTE: Habilitar en Apps Script > Servicios > Gmail API
+    //   Referencia: Gmail.Users.Messages.send(message, userId)
+    try {
+        var response = Gmail.Users.Messages.send({ raw: base64url }, 'me');
+
+        addChatMessage({
+            referenciaId: targetId,
+            modulo: 'pedido',
+            tipo: 'sistema',
+            mensaje: tipoDoc + ' enviada a <strong>' + data.destinatario + '</strong>.' +
+                (response && response.id ? ' MessageId: ' + response.id : ''),
+            usuario: data.usuario || 'Sistema'
+        });
+
+        return {
+            status: 'success',
+            message: tipoDoc + ' enviada exitosamente a ' + data.destinatario,
+            messageId: response ? response.id : null
+        };
+
+    } catch (errAdvanced) {
+        // Fallback: GmailApp b\u00e1sico (no requiere habilitar servicio avanzado)
+        try {
+            GmailApp.sendEmail(
+                String(data.destinatario).trim(),
+                asunto,
+                textPlano,
+                {
+                    htmlBody: htmlBody,
+                    name: 'FixOps \u2014 TechFix Solutions',
+                    cc: (data.cc && data.cc.trim()) ? data.cc.trim() : ''
+                }
+            );
+
+            addChatMessage({
+                referenciaId: targetId,
+                modulo: 'pedido',
+                tipo: 'sistema',
+                mensaje: tipoDoc + ' enviada a <strong>' + data.destinatario + '</strong> (v\u00eda GmailApp).',
+                usuario: data.usuario || 'Sistema'
+            });
+
+            return {
+                status: 'success',
+                message: tipoDoc + ' enviada a ' + data.destinatario + ' (usando GmailApp).'
+            };
+
+        } catch (errBasic) {
+            return {
+                status: 'error',
+                message: 'No se pudo enviar el correo. ' +
+                    'Gmail API: ' + errAdvanced.message + '. ' +
+                    'GmailApp: ' + errBasic.message + '. ' +
+                    'Verifique permisos y que Gmail API est\u00e9 habilitado en los Servicios del script.'
+            };
+        }
+    }
 }
