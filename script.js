@@ -1617,6 +1617,7 @@ function openNewOrderModal(tipo) {
     const emailBtn = document.getElementById('newOrd_email_btn');
     if (emailBtn) emailBtn.style.display = isCompra ? 'none' : 'inline-flex';
 
+    newOrdLastPedidoId = null; // Resetear borrador anterior
     openModal('modalNewOrder');
 }
 
@@ -1690,8 +1691,11 @@ async function newOrdSubmit(mode) {
     }
     let usuario = '';
     try { usuario = JSON.parse(localStorage.getItem('currentUser') || '{}').usuario || ''; } catch (e) { }
+    const isUpdate = !!newOrdLastPedidoId;
     const payload = {
-        action: 'crearPedido', tipo: newOrdTipo,
+        action: isUpdate ? 'actualizarPedido' : 'crearPedido',
+        pedidoId: isUpdate ? newOrdLastPedidoId : undefined,
+        tipo: newOrdTipo,
         contacto: document.getElementById('newOrd_contacto').value,
         fecha: document.getElementById('newOrd_fecha').value,
         metodo_pago: document.getElementById('newOrd_metodo_pago').value,
@@ -2079,17 +2083,33 @@ async function openOrderDetails(pedidoId, tipo) {
     document.getElementById('mord_complete_btn').style.display = estadoNorm === 'confirmado' ? '' : 'none';
     document.getElementById('mord_cancel_btn').style.display = (isActive && estadoNorm !== 'completado') ? '' : 'none';
     document.getElementById('mord_add_line_wrapper').style.display = esBorrador ? '' : 'none';
-    // El botón email se asigna después de openModal (ver más abajo)
+
+    // ── Total del pedido para el módulo de pagos ──────────────────────────
+    pagoCurrentTotal = parseFloat(pedido.total) || 0;
+    pagoCurrentSaldo = pagoCurrentTotal; // se actualizará al cargar pagos
+    pagoCurrentPedidoId = pedidoId;
 
     // Cargar líneas de detalle
     const tbody = document.getElementById('mord_items_body');
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando productos...</td></tr>';
     openModal('modalOrderDetails');
 
-    // Botón email: se asigna DESPUÉS de openModal para no ser sobreescrito
-    // Visible para todos los estados (borrador = cotización, confirmado/completado = factura)
+    // ── Botones post-openModal (para no ser sobreescritos por animación) ──
     const emailBtn = document.getElementById('mord_email_btn');
+    const pagoBtn = document.getElementById('mord_pago_btn');
+    const pagoBanner = document.getElementById('mord_pago_banner');
+    const pagosSection = document.getElementById('mord_pagos_section');
+
+    // Email: visible siempre excepto cancelados
     if (emailBtn) emailBtn.style.display = estadoNorm !== 'cancelado' ? 'inline-flex' : 'none';
+
+    // Pago: solo para confirmados o completados (no borradores ni cancelados)
+    const permitesPago = (estadoNorm === 'confirmado' || estadoNorm === 'completado');
+    if (pagoBtn) pagoBtn.style.display = permitesPago ? 'inline-flex' : 'none';
+
+    // Ocultar banner y sección de pagos hasta que carguen
+    if (pagoBanner) pagoBanner.style.display = permitesPago ? 'block' : 'none';
+    if (pagosSection) pagosSection.style.display = 'none';
 
     try {
         const res = await fetch(`${SCRIPT_URL}?action=getDetallePedido&pedidoId=${encodeURIComponent(pedidoId)}&tipo=${tipo}`);
@@ -2105,8 +2125,9 @@ async function openOrderDetails(pedidoId, tipo) {
 
     mordCalcTotals();
 
-    // Cargar el chatter del pedido
+    // Cargar el chatter del pedido y los pagos
     loadChatter(pedidoId);
+    if (permitesPago) loadPagosPedido(pedidoId);
 
     // Listeners para desc/iva
     document.getElementById('mord_descuento').oninput = mordCalcTotals;
@@ -2270,6 +2291,7 @@ function mordCalcTotals() {
     const applyIva = document.getElementById('mord_apply_iva').checked;
     const iva = applyIva ? subtotalConDesc * 0.19 : 0;
     const total = subtotalConDesc + iva;
+    pagoCurrentTotal = total; // Mantener total actualizado para el módulo de pagos
 
     document.getElementById('mord_base_imponible').textContent = formatCOP(subtotal);
     document.getElementById('mord_iva').textContent = formatCOP(iva);
@@ -2752,4 +2774,390 @@ function showEmailStatus(msg, type) {
     el.style.color = s.color;
     el.style.borderColor = s.border;
     el.textContent = msg;
+}
+
+// ========================================================
+// MÓDULO DE PAGOS Y CARTERA (ABONOS ESTILO ODOO)
+// ========================================================
+
+let pagoCurrentPedidoId = null;
+let pagoCurrentSaldo = 0;
+let pagoCurrentTotal = 0;
+
+/**
+ * Abre el modal de registro de pago pre-rellenado con el saldo pendiente.
+ * @param {number} [saldoOverride] — saldo a prellenar (opcional, por defecto usa pagoCurrentSaldo)
+ */
+function openPagoModal(saldoOverride) {
+    if (!chatterCurrentRef) { showToast('No hay pedido abierto.', 'warning'); return; }
+
+    pagoCurrentPedidoId = chatterCurrentRef;
+    const saldo = saldoOverride !== undefined ? saldoOverride : pagoCurrentSaldo;
+
+    // Preview del pedido
+    const refEl = document.getElementById('modal_order_id_label');
+    const titleEl = document.getElementById('modal_order_title');
+    const contactoEl = document.getElementById('mord_contacto');
+    const pedidoRef = refEl ? refEl.textContent.trim() : pagoCurrentPedidoId;
+    const tipoPedido = titleEl ? (titleEl.textContent.toLowerCase().includes('compra') ? 'Compra' : 'Venta') : '';
+    const contacto = contactoEl && contactoEl.selectedIndex >= 0
+        ? (contactoEl.options[contactoEl.selectedIndex]?.text || '') : '';
+
+    const docRef = document.getElementById('pago_doc_ref');
+    const docCon = document.getElementById('pago_doc_contacto');
+    const saldoL = document.getElementById('pago_saldo_label');
+    if (docRef) docRef.textContent = `Pedido de ${tipoPedido} · ${pedidoRef}`;
+    if (docCon) docCon.textContent = contacto;
+    if (saldoL) saldoL.textContent = formatCOP(saldo);
+
+    // Resetear formulario
+    document.getElementById('pago_fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pago_monto').value = Math.round(saldo);
+    document.getElementById('pago_metodo').value = 'Efectivo';
+    document.getElementById('pago_referencia').value = '';
+    document.getElementById('pago_notas').value = '';
+    document.getElementById('pago_forzar_pagado').checked = false;
+    const stEl = document.getElementById('pago_status');
+    if (stEl) { stEl.style.display = 'none'; stEl.textContent = ''; }
+
+    // Mostrar modal encima de todo
+    const modal = document.getElementById('modalPago');
+    if (modal) {
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+        setTimeout(() => document.getElementById('pago_monto')?.focus(), 120);
+    }
+}
+
+function closePagoModal() {
+    const modal = document.getElementById('modalPago');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Envía el pago al backend y actualiza el banner + la lista de pagos.
+ */
+async function submitPago() {
+    const monto = parseFloat(document.getElementById('pago_monto').value);
+    if (!monto || monto <= 0) {
+        showPagoStatus('El monto debe ser mayor a cero.', 'error'); return;
+    }
+    if (!pagoCurrentPedidoId) {
+        showPagoStatus('Error: pedido no identificado.', 'error'); return;
+    }
+
+    const btn = document.getElementById('pago_submit_btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Procesando...'; }
+    showPagoStatus('Registrando pago...', 'info');
+
+    let usuario = '';
+    try { usuario = JSON.parse(localStorage.getItem('currentUser') || '{}').usuario || ''; } catch (e) { }
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'registrarPago',
+                pedidoId: pagoCurrentPedidoId,
+                fecha: document.getElementById('pago_fecha').value,
+                monto,
+                metodoPago: document.getElementById('pago_metodo').value,
+                referencia: document.getElementById('pago_referencia').value,
+                notas: document.getElementById('pago_notas').value,
+                forzarPagado: document.getElementById('pago_forzar_pagado').checked,
+                usuario
+            })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showPagoStatus('✓ ' + data.message, 'success');
+            showToast(data.message, 'success');
+
+            // 1. Actualizar estado pago en UI y GlobalData para evitar Race Conditions con la API de Sheets
+            pagoCurrentSaldo = data.saldoPendiente !== undefined ? data.saldoPendiente : pagoCurrentSaldo;
+
+            const newPago = {
+                id: data.pagoId || 'PAG-TEMP',
+                fecha: document.getElementById('pago_fecha').value,
+                monto: monto,
+                metodo_pago: document.getElementById('pago_metodo').value,
+                metodo: document.getElementById('pago_metodo').value,
+                referencia: document.getElementById('pago_referencia').value,
+                notas: document.getElementById('pago_notas').value
+            };
+            if (!window.pagosDataGlobal) window.pagosDataGlobal = [];
+            window.pagosDataGlobal.push(newPago);
+
+            if (data.totalPagado !== undefined) {
+                renderPagosBanner(data.estadoPago, data.totalPagado, pagoCurrentTotal);
+                renderPagosHistory(window.pagosDataGlobal, pagoCurrentTotal, pagoCurrentPedidoId);
+            }
+
+            // Recargar únicamente el chatter, el pago lo actualizamos localmente
+            // await loadPagosPedido(pagoCurrentPedidoId); // Deshabilitado para evitar race-condition con el backend
+            if (chatterCurrentRef) loadChatter(chatterCurrentRef);
+
+            // Cerrar modal tras 1.5s
+            setTimeout(closePagoModal, 1500);
+        } else {
+            showPagoStatus('✗ ' + data.message, 'error');
+        }
+    } catch (e) {
+        showPagoStatus('Error de conexión: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Registrar Pago'; }
+    }
+}
+
+function showPagoStatus(msg, type) {
+    const el = document.getElementById('pago_status');
+    if (!el) return;
+    const s = {
+        success: { bg: '#dcfce7', color: '#166534', border: '#22c55e' },
+        error: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' },
+        info: { bg: '#dbeafe', color: '#1e40af', border: '#3b82f6' }
+    }[type] || {};
+    el.style.display = 'block';
+    el.style.background = s.bg;
+    el.style.color = s.color;
+    el.style.borderColor = s.border;
+    el.textContent = msg;
+}
+
+/**
+ * Carga los pagos de un pedido y renderiza el banner + lista de abonos.
+ */
+async function loadPagosPedido(pedidoId) {
+    if (!pedidoId) return;
+    try {
+        const res = await fetch(`${SCRIPT_URL}?action=getPagosPedido&pedidoId=${encodeURIComponent(pedidoId)}`);
+        const data = await res.json();
+        if (data.status !== 'success') return;
+
+        // Fallback: Compute totalPagado from array if backend doesn't send it directly
+        let computedTotalPagado = 0;
+        if (data.pagos && Array.isArray(data.pagos)) {
+            computedTotalPagado = data.pagos.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0);
+        }
+
+        const totalPedido = pagoCurrentTotal || 0;
+        const totalPagado = data.totalPagado !== undefined ? data.totalPagado : computedTotalPagado;
+        const saldo = Math.max(0, totalPedido - totalPagado);
+        pagoCurrentSaldo = saldo;
+
+        // Inferir estado de pago
+        let estadoPago = 'sin_pago';
+        if (totalPagado >= totalPedido && totalPedido > 0) estadoPago = 'pagado';
+        else if (totalPagado > 0) estadoPago = 'parcial';
+
+        renderPagosBanner(estadoPago, totalPagado, totalPedido);
+        renderPagosHistory(data.pagos || [], totalPedido, pedidoId);
+
+        // Guardar pagos globalmente para uso en otros lados (ej. PDF)
+        window.pagosDataGlobal = data.pagos || [];
+
+    } catch (e) { console.warn('[loadPagosPedido]', e); }
+}
+
+/**
+ * Renderiza el banner de estado de pago con barra de progreso.
+ */
+function renderPagosBanner(estadoPago, totalPagado, total) {
+    const banner = document.getElementById('mord_pago_banner');
+    const badge = document.getElementById('mord_estado_pago_badge');
+    const resumen = document.getElementById('mord_pago_resumen');
+    const saldoEl = document.getElementById('mord_pago_saldo');
+    const progress = document.getElementById('mord_pago_progress');
+    if (!banner) return;
+
+    const pct = total > 0 ? Math.min(100, (totalPagado / total) * 100) : 0;
+
+    const cfg = {
+        sin_pago: { label: 'Sin Pago', bg: '#fee2e2', color: '#991b1b', bar: '#ef4444' },
+        parcial: { label: 'Pago Parcial', bg: '#fef3c7', color: '#92400e', bar: '#f59e0b' },
+        pagado: { label: 'Pagado', bg: '#dcfce7', color: '#166534', bar: '#22c55e' }
+    };
+    const c = cfg[estadoPago] || cfg.sin_pago;
+
+    badge.textContent = c.label;
+    badge.style.background = c.bg;
+    badge.style.color = c.color;
+    resumen.textContent = `${formatCOP(totalPagado)} de ${formatCOP(total)}`;
+    const saldo = Math.max(0, total - totalPagado);
+    saldoEl.textContent = saldo > 0 ? `Saldo: ${formatCOP(saldo)}` : '✅ Pagado completo';
+    saldoEl.style.color = estadoPago === 'pagado' ? '#22c55e' : '#0ea5e9';
+    if (progress) {
+        progress.style.background = `linear-gradient(90deg, #0ea5e9, ${c.bar})`;
+        progress.style.width = pct + '%';
+    }
+
+    banner.style.display = 'block';
+}
+
+/**
+ * Renderiza la lista de pagos registrados dentro del modal.
+ */
+function renderPagosHistory(pagos, total, pedidoId) {
+    const section = document.getElementById('mord_pagos_section');
+    const list = document.getElementById('mord_pagos_list');
+    const countBdg = document.getElementById('mord_pagos_count');
+    if (!section || !list) return;
+
+    if (!pagos || pagos.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    if (countBdg) countBdg.textContent = pagos.length;
+
+    const metodosIcons = {
+        'Efectivo': '💵', 'Transferencia': '🏦', 'Cheque': '📝',
+        'PSE': '💻', 'Tarjeta Crédito': '💳', 'Tarjeta Débito': '💳', 'Otro': '🔄'
+    };
+
+    list.innerHTML = pagos.map(p => {
+        const monto = parseFloat(p.monto) || 0;
+        const fecha = p.fecha ? new Date(p.fecha).toLocaleDateString('es-CO',
+            { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const icon = metodosIcons[p.metodo_pago] || '💰';
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+                    background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.1rem;">${icon}</span>
+                <div>
+                    <div style="font-size:0.82rem;font-weight:700;color:#1e293b;">
+                        ${p.id} — ${p.metodo_pago || '—'}
+                        ${p.referencia ? `<span style="font-weight:400;color:#64748b;">· ${p.referencia}</span>` : ''}
+                    </div>
+                    <div style="font-size:0.75rem;color:#94a3b8;">${fecha} · ${p.usuario || ''}</div>
+                    ${p.notas ? `<div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${p.notas}</div>` : ''}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                <span style="font-weight:800;font-size:0.95rem;color:#0ea5e9;">${formatCOP(monto)}</span>
+                <button onclick="anularPagoFrontend('${p.id}','${pedidoId}')"
+                    title="Anular este pago"
+                    style="background:none;border:1.5px solid #fca5a5;border-radius:6px;padding:3px 8px;
+                           cursor:pointer;color:#ef4444;font-size:0.72rem;font-weight:700;
+                           transition:all 0.2s;" onmouseover="this.style.background='#fee2e2'"
+                    onmouseout="this.style.background='none'">
+                    Anular
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/**
+ * Anula un pago tras confirmación del usuario.
+ */
+async function anularPagoFrontend(pagoId, pedidoId) {
+    if (!confirm(`¿Anular el pago ${pagoId}? Esta acción recalculará el saldo pendiente.`)) return;
+
+    let usuario = '';
+    try { usuario = JSON.parse(localStorage.getItem('currentUser') || '{}').usuario || ''; } catch (e) { }
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'anularPago', pagoId, pedidoId, usuario })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast(`Pago ${pagoId} anulado.`, 'success');
+            if (data.totalPagado !== undefined) {
+                renderPagosBanner(data.estadoPago, data.totalPagado, pagoCurrentTotal);
+                pagoCurrentSaldo = Math.max(0, pagoCurrentTotal - data.totalPagado);
+
+                // Actualizar array manual eliminando el pago anulado
+                if (window.pagosDataGlobal) {
+                    window.pagosDataGlobal = window.pagosDataGlobal.filter(p => p.id !== pagoId);
+                    renderPagosHistory(window.pagosDataGlobal, pagoCurrentTotal, pedidoId);
+                }
+            }
+            // await loadPagosPedido(pedidoId); // Deshabilitado temporalmente para evitar race condition
+            if (chatterCurrentRef) loadChatter(chatterCurrentRef);
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+
+}
+
+function printReceipt() {
+    if (!currentPedidoData) return;
+    const calc = calculateOrderTotals(currentPedidoData);
+    let html = `
+    <html><head><title>Recibo - ${currentPedidoData.id}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 40px; }
+        .header { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; }
+        .title { font-size: 24px; color: #1e293b; font-weight: bold; margin: 0; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+        .label { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+        .val { font-size: 14px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th { text-align: left; padding: 10px; border-bottom: 2px solid #333; font-size: 12px; text-transform: uppercase; }
+        td { padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .text-right { text-align: right; }
+        .totals { width: 300px; margin-left: auto; border: 1px solid #eee; padding: 20px; border-radius: 8px; }
+        .t-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .t-row.grand { font-size: 18px; font-weight: bold; margin-top: 15px; padding-top: 15px; border-top: 2px solid #333; }
+        .pagos-list { margin-top: 50px; }
+        .pagos-list h4 { margin-bottom: 15px; font-size: 14px; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .pago-item { display:flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 13.5px; }
+    </style></head><body>
+    <div class="header">
+        <div><h1 class="title">TechFix Solutions</h1><div style="color:#64748b; margin-top:10px; font-size:14px;">Nit: 900.000.000-1<br>Bogotá, Colombia</div></div>
+        <div style="text-align:right;"><div class="title" style="color:#0ea5e9;">${currentPedidoData.tipo === 'venta' ? 'Factura de Venta' : 'Cotización'}</div><div style="font-size:18px; color:#64748b; margin-top:5px;"># ${currentPedidoData.id}</div></div>
+    </div>
+    <div class="info-grid">
+        <div><div class="label">Cliente</div><div class="val" style="font-size:16px;">${currentPedidoData.contacto || 'Cliente Mostrador'}</div></div>
+        <div><div class="label">Fecha</div><div class="val">${new Date(currentPedidoData.fecha).toLocaleDateString()}</div></div>
+    </div>
+    <table><thead><tr><th>Descripción</th><th class="text-right">Cantidad</th><th class="text-right">Precio Unitario</th><th class="text-right">Subtotal</th></tr></thead><tbody>`;
+
+    let items = [];
+    try { items = typeof currentPedidoData.items === 'string' ? JSON.parse(currentPedidoData.items) : currentPedidoData.items; } catch (e) { }
+    items.forEach(it => {
+        html += `<tr><td>${it.nombre}</td><td class="text-right">${parseFloat(it.cantidad)}</td><td class="text-right">${formatCOP(it.precio)}</td><td class="text-right">${formatCOP(it.cantidad * it.precio)}</td></tr>`;
+    });
+
+    html += `</tbody></table>
+            <div class="totals"><div class="t-row"><span>Base Imponible</span><span>${formatCOP(calc.base)}</span></div>
+                ${calc.descuento > 0 ? `<div class="t-row" style="color:#ef4444;"><span>Descuento</span><span>-${formatCOP(calc.descuento)}</span></div>` : ''}
+                ${calc.iva > 0 ? `<div class="t-row"><span>IVA (19%)</span><span>${formatCOP(calc.iva)}</span></div>` : ''}
+                <div class="t-row grand"><span>Total</span><span>${formatCOP(calc.total)}</span></div>
+            </div>`;
+
+    if (window.pagosDataGlobal && window.pagosDataGlobal.length > 0) {
+        html += `<div class="pagos-list"><h4>Abonos Registrados</h4>`;
+        let pagado = 0;
+        window.pagosDataGlobal.forEach(p => {
+            pagado += parseFloat(p.monto);
+            html += `<div class="pago-item"><span>${new Date(p.fecha).toLocaleDateString()} — ${p.metodo} ${p.referencia ? '(' + p.referencia + ')' : ''}</span>
+                <span style="font-weight:600; color:#10b981;">-${formatCOP(p.monto)}</span></div>`;
+        });
+        html += `<div style="display:flex; justify-content:space-between; margin-top:20px; padding:15px; background:#f0f9ff; border-radius:8px; border:1px solid #bae6fd;">
+            <span style="font-size:14px; font-weight:bold; color:#0284c7;">IMPORTE ADEUDADO</span>
+            <span style="font-size:18px; font-weight:800; color:#0ea5e9;">${formatCOP(Math.max(0, calc.total - pagado))}</span>
+        </div></div>`;
+    }
+    html += `</body></html>`;
+
+    // Inyectarlo en la vista para impresión nativa (nueva ventana)
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+        printWin.document.write(html);
+        printWin.document.close();
+        printWin.focus();
+        setTimeout(() => { printWin.print(); }, 250);
+    } else {
+        showToast('El navegador bloqueó la ventana emergente de impresión', 'warning');
+    }
 }

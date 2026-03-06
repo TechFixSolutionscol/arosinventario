@@ -1225,140 +1225,7 @@
     <script src="script.js"></script>
     <script src="user_management.js"></script>
 
-    <!-- ===== MODAL: Detalle de Pedido (Odoo-Style) ===== -->
-    <div id="modalOrderDetails" class="modal-overlay" style="display:none; align-items:flex-start; padding:20px;">
-        <div class="modal-box"
-            style="width:100%; max-width:1000px; margin:auto; max-height:95vh; display:flex; flex-direction:column;">
 
-            <!-- Header del modal -->
-            <div class="modal-header" style="flex-shrink:0;">
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <h3 id="modal_order_title" style="margin:0;"><i class="fas fa-file-invoice"></i> Pedido</h3>
-                    <span id="modal_order_id_label" style="font-size:1.2rem; font-weight:800; color:#666;"></span>
-                </div>
-                <button class="modal-close" onclick="closeModal('modalOrderDetails')">&times;</button>
-            </div>
-
-            <!-- Pipeline de estados (Odoo-style) -->
-            <div id="modal_order_pipeline"
-                style="flex-shrink:0; background:#f8f9fa; padding:12px 20px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                <div class="pipeline-step" id="pipe_borrador" onclick="">
-                    <i class="fas fa-file-alt"></i> Borrador
-                </div>
-                <div class="pipeline-arrow">›</div>
-                <div class="pipeline-step" id="pipe_confirmado">
-                    <i class="fas fa-check"></i> Confirmado
-                </div>
-                <div class="pipeline-arrow">›</div>
-                <div class="pipeline-step" id="pipe_completado">
-                    <i class="fas fa-check-double"></i> Completado
-                </div>
-            </div>
-
-            <!-- Botonera de acciones -->
-            <div id="modal_order_actions"
-                style="flex-shrink:0; padding:12px 20px; border-bottom:1px solid #eee; display:flex; gap:10px;">
-                <button id="mord_save_btn" class="btn secondary-btn" style="display:none;">
-                    <i class="fas fa-save"></i> Guardar Cambios
-                </button>
-                <button id="mord_confirm_btn" class="btn primary-btn" style="display:none;">
-                    <i class="fas fa-check-circle"></i> Confirmar
-                </button>
-                <button id="mord_complete_btn" class="btn" style="background:#27ae60;color:white;display:none;">
-                    <i class="fas fa-check-double"></i> Completar
-                </button>
-                <button id="mord_cancel_btn" class="btn danger-btn" style="display:none;">
-                    <i class="fas fa-times-circle"></i> Cancelar Pedido
-                </button>
-            </div>
-
-            <div id="modal_order_status" class="status-message" style="margin:0 20px; flex-shrink:0;"></div>
-
-            <!-- Cuerpo del modal -->
-            <div class="modal-body" style="overflow-y:auto; flex:1; padding: 20px;">
-                <!-- Cabecera del pedido -->
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-bottom:20px;">
-                    <div class="form-group" style="margin:0;">
-                        <label id="mord_contact_label">Proveedor / Cliente:</label>
-                        <select id="mord_contacto" style="width:100%;">
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>Fecha:</label>
-                        <input type="date" id="mord_fecha" style="width:100%;">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>Método de Pago:</label>
-                        <select id="mord_metodo_pago" style="width:100%;">
-                            <option value="">Seleccionar</option>
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Transferencia">Transferencia</option>
-                            <option value="Crédito">Crédito</option>
-                            <option value="Cheque">Cheque</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin:0; grid-column:1/-1;">
-                        <label>Notas / Observaciones:</label>
-                        <textarea id="mord_notas" rows="2"
-                            style="width:100%; resize:vertical; border:1px solid #ddd; border-radius:8px; padding:8px;"></textarea>
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>Descuento (%):</label>
-                        <input type="number" id="mord_descuento" value="0" min="0" max="100" step="0.5"
-                            style="width:100%;">
-                    </div>
-                    <div class="form-group"
-                        style="margin:0; display:flex; align-items:center; gap:10px; padding-top:25px;">
-                        <input type="checkbox" id="mord_apply_iva" style="width:20px;height:20px;">
-                        <label for="mord_apply_iva" style="margin:0;cursor:pointer;"><b>Aplicar IVA (19%)</b></label>
-                    </div>
-                </div>
-
-                <!-- Tabla de productos -->
-                <div style="overflow-x:auto; margin-bottom:15px;">
-                    <table class="order-table" id="mord_items_table">
-                        <thead>
-                            <tr>
-                                <th style="width:40%;">Producto</th>
-                                <th>Cantidad</th>
-                                <th>Precio Unit.</th>
-                                <th>Subtotal</th>
-                                <th id="mord_col_actions"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="mord_items_body"></tbody>
-                    </table>
-                </div>
-
-                <div id="mord_add_line_wrapper" style="display:none; margin-bottom:15px;">
-                    <button type="button" class="btn secondary-btn" id="mord_add_line">
-                        <i class="fas fa-plus"></i> Agregar producto
-                    </button>
-                </div>
-
-                <!-- Totales -->
-                <div class="totals-section">
-                    <div class="total-row">
-                        <span>Base Imponible:</span>
-                        <span id="mord_base_imponible">$0</span>
-                    </div>
-                    <div class="total-row" id="mord_descuento_row" style="display:none;">
-                        <span>Descuento:</span>
-                        <span id="mord_descuento_val">-$0</span>
-                    </div>
-                    <div class="total-row">
-                        <span>IVA (19%):</span>
-                        <span id="mord_iva">$0</span>
-                    </div>
-                    <div class="total-row grand-total">
-                        <span>Total:</span>
-                        <span id="mord_total">$0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <style>
         /* ---- Pipeline Odoo-style (modal detalle) ---- */
@@ -1597,10 +1464,45 @@
                         class="fas fa-check-double"></i> Completar</button>
                 <button id="mord_cancel_btn" class="btn danger-btn" style="display:none;"><i
                         class="fas fa-times-circle"></i> Cancelar Pedido</button>
-                <button id="mord_email_btn" class="btn" style="background:#7c3aed;color:white;display:none;"
+                <!-- Botón Registrar Pago -->
+                <button id="mord_pago_btn" class="btn"
+                    style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;display:none;gap:6px;"
+                    onclick="openPagoModal()">
+                    <i class="fas fa-credit-card"></i> Registrar Pago
+                </button>
+                <!-- Botón Imprimir Recibo -->
+                <button id="mord_print_receipt_btn" class="btn"
+                    style="background:#f59e0b;color:white;display:none;gap:6px;" onclick="printReceipt()">
+                    <i class="fas fa-file-pdf"></i> Imprimir Recibo
+                </button>
+                <button id="mord_email_btn" class="btn" style="background:#7c3aed;color:white;display:none;gap:6px;"
                     onclick="openEmailModal()">
                     <i class="fas fa-envelope"></i> Enviar por Correo
                 </button>
+            </div>
+            <!-- Banner de estado de pago (solo visible para confirmados/completados) -->
+            <div id="mord_pago_banner" style="display:none;flex-shrink:0;padding:10px 20px;
+                         background:#f0f9ff;border-bottom:1px solid #bae6fd;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span id="mord_estado_pago_badge"
+                            style="font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px;">Sin
+                            Pago</span>
+                        <span id="mord_pago_resumen" style="font-size:0.82rem;color:#475569;"></span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.7rem;color:#0284c7;font-weight:600;text-transform:uppercase;">Saldo
+                            Pendiente</div>
+                        <div id="mord_pago_saldo" style="font-size:1.1rem;font-weight:800;color:#0ea5e9;line-height:1;">
+                            $0</div>
+                    </div>
+                </div>
+                <!-- Progress bar -->
+                <div style="width:100%;height:6px;background:#e0f2fe;border-radius:3px;overflow:hidden;">
+                    <div id="mord_pago_progress"
+                        style="height:100%;width:0%;background:linear-gradient(90deg,#38bdf8,#0ea5e9);border-radius:3px;transition:width 0.4s ease;">
+                    </div>
+                </div>
             </div>
             <div id="modal_order_status" class="status-message" style="margin:0 20px; flex-shrink:0;"></div>
             <div class="modal-body" style="overflow-y:auto; flex:1; padding:20px;">
@@ -1660,6 +1562,18 @@
                             id="mord_descuento_val">-$0</span></div>
                     <div class="total-row"><span>IVA (19%):</span><span id="mord_iva">$0</span></div>
                     <div class="total-row grand-total"><span>Total:</span><span id="mord_total">$0</span></div>
+                </div>
+
+                <!-- ===== SECCIÓN DE PAGOS REGISTRADOS ===== -->
+                <div id="mord_pagos_section"
+                    style="display:none; clear:both; padding-top:20px; margin-top:20px; border-top:2px dashed var(--border, #e2e8f0);">
+                    <h3
+                        style="margin-bottom:14px; display:flex; align-items:center; gap:8px; font-size:1.1rem; color:#0f172a;">
+                        <i class="fas fa-money-bill-wave" style="color:#10b981;"></i> Pagos Registrados
+                    </h3>
+                    <div id="mord_pagos_list" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
                 </div>
 
                 <!-- ===== CHATTER / LOG DE ACTIVIDAD ===== -->
@@ -1793,6 +1707,137 @@
             </div>
         </div>
     </div>
+
+    <!-- ===== MODAL PAGOS (Cobranza Odoo-Style) ===== -->
+    <div id="modalPago" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);
+            backdrop-filter:blur(4px);z-index:3000;align-items:center;justify-content:center;">
+        <div style="background:var(--card-bg,#fff);border-radius:16px;width:90%;max-width:500px;
+                    box-shadow:0 24px 80px rgba(0,0,0,0.25);border:1px solid var(--border,#e2e8f0);
+                    animation:modalIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both;">
+
+            <!-- Header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:18px 22px;border-bottom:1px solid var(--border,#e2e8f0);">
+                <h3
+                    style="display:flex;align-items:center;gap:10px;font-size:1rem;font-weight:700;color:var(--text,#1e293b);">
+                    <i class="fas fa-credit-card" style="color:#0ea5e9;"></i>
+                    Registrar Pago
+                </h3>
+                <button onclick="closePagoModal()"
+                    style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Info del pedido -->
+            <div id="pago_doc_preview" style="margin:14px 22px 0;padding:12px 16px;border-radius:10px;
+                         background:linear-gradient(135deg,#0ea5e918,#22c55e12);border:1px solid #0ea5e933;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <i class="fas fa-file-invoice-dollar" style="font-size:1.2rem;color:#0ea5e9;"></i>
+                        <div>
+                            <div id="pago_doc_ref" style="font-weight:700;font-size:0.9rem;color:#1e293b;"></div>
+                            <div id="pago_doc_contacto" style="font-size:0.78rem;color:#64748b;"></div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.4px;">Saldo
+                            pendiente</div>
+                        <div id="pago_saldo_label" style="font-size:1rem;font-weight:800;color:#0ea5e9;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;">
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;
+                                      letter-spacing:0.4px;">Fecha *</label>
+                        <input id="pago_fecha" type="date"
+                            style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;
+                                   font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;margin-top:6px;"
+                            onfocus="this.style.borderColor='#0ea5e9'" onblur="this.style.borderColor='#e2e8f0'">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;
+                                      letter-spacing:0.4px;">Monto *</label>
+                        <div style="position:relative;margin-top:6px;">
+                            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
+                                         color:#94a3b8;font-size:0.85rem;pointer-events:none;">$</span>
+                            <input id="pago_monto" type="number" min="1" step="1" placeholder="0" style="width:100%;padding:9px 12px 9px 26px;border:1.5px solid #e2e8f0;border-radius:10px;
+                                       font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;"
+                                onfocus="this.style.borderColor='#0ea5e9'" onblur="this.style.borderColor='#e2e8f0'">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;
+                                  letter-spacing:0.4px;">Método de Pago *</label>
+                    <select id="pago_metodo" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:6px;
+                               font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;"
+                        onfocus="this.style.borderColor='#0ea5e9'" onblur="this.style.borderColor='#e2e8f0'">
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                        <option value="Cheque">📝 Cheque</option>
+                        <option value="PSE">💻 PSE</option>
+                        <option value="Tarjeta Crédito">💳 Tarjeta de Crédito</option>
+                        <option value="Tarjeta Débito">💳 Tarjeta de Débito</option>
+                        <option value="Otro">🔄 Otro</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;
+                                  letter-spacing:0.4px;">Referencia / No. Comprobante</label>
+                    <input id="pago_referencia" type="text" placeholder="Ej: TXN-12345 (opcional)" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:6px;
+                               font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.2s;"
+                        onfocus="this.style.borderColor='#0ea5e9'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;
+                                  letter-spacing:0.4px;">Notas</label>
+                    <textarea id="pago_notas" rows="2" placeholder="Observaciones del pago (opcional)"
+                        style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:6px;
+                               font-size:0.9rem;font-family:inherit;outline:none;resize:vertical;transition:border-color 0.2s;" onfocus="this.style.borderColor='#0ea5e9'"
+                        onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                </div>
+
+                <!-- Opción marcar como pagado completo -->
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                             background:#f0f9ff;border-radius:10px;border:1px solid #bae6fd;">
+                    <input type="checkbox" id="pago_forzar_pagado"
+                        style="width:16px;height:16px;accent-color:#0ea5e9;cursor:pointer;">
+                    <label for="pago_forzar_pagado"
+                        style="font-size:0.85rem;font-weight:600;color:#0284c7;cursor:pointer;margin:0;">
+                        Marcar como pagado completo (cerrar saldo pendiente)
+                    </label>
+                </div>
+
+                <div id="pago_status" style="display:none;padding:10px 14px;border-radius:10px;
+                             font-size:0.875rem;font-weight:500;border-left:4px solid;"></div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 22px;border-top:1px solid var(--border,#e2e8f0);
+                        display:flex;justify-content:flex-end;gap:10px;">
+                <button onclick="closePagoModal()" style="padding:9px 18px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;
+                           font-size:0.875rem;font-weight:600;cursor:pointer;font-family:inherit;">
+                    Cancelar
+                </button>
+                <button id="pago_submit_btn" onclick="submitPago()" style="padding:9px 20px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;
+                           border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;
+                           display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(14,165,233,0.3);
+                           font-family:inherit;transition:all 0.2s;">
+                    <i class="fas fa-check"></i> Registrar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Contenedor de Toasts -->
     <div id="toast-container"

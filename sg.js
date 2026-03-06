@@ -25,11 +25,19 @@ const USUARIOS_HEADERS = ["usuario", "hash", "rol", "created"];
 
 // Pedidos (encabezados de órdenes)
 const HOJA_PEDIDOS = "Pedidos";
-const PEDIDOS_HEADERS = ["id", "tipo", "estado", "contacto", "fecha", "notas", "metodo_pago", "descuento", "total", "usuario", "fecha_creacion", "fecha_actualizado"];
+const PEDIDOS_HEADERS = ["id", "tipo", "estado", "contacto", "fecha", "notas", "metodo_pago",
+    "descuento", "total", "usuario", "fecha_creacion", "fecha_actualizado",
+    "estado_pago", "total_pagado"];
 
 // Chatter / Log de actividad
 const HOJA_LOG = "Log";
 const LOG_HEADERS = ["id", "referencia_id", "modulo", "tipo", "mensaje", "usuario", "fecha"];
+
+// Pagos / Cartera (abonos a pedidos)
+const HOJA_PAGOS = "Pagos";
+const PAGOS_HEADERS = ["id", "pedido_id", "tipo_pedido", "fecha", "monto",
+    "metodo_pago", "referencia", "notas", "usuario", "fecha_registro"];
+
 // Credenciales por defecto (se crearán automáticamente al inicializar la BD)
 const DEFAULT_ADMIN_USER = "admin";
 const DEFAULT_ADMIN_PASS = "admin";
@@ -76,6 +84,8 @@ function doGet(e) {
             result = getDetallePedido(e.parameter);
         } else if (action === "getChatter") {
             result = getChatter(e.parameter);
+        } else if (action === "getPagosPedido") {
+            result = getPagosPedido(e.parameter);
         } else if (action === "getData" && sheetName) {
             result = getData(sheetName);
         } else {
@@ -157,6 +167,10 @@ function doPost(e) {
             result = addChatMessage(requestData);
         } else if (action === 'enviarCorreoPedido') {
             result = enviarCorreoPedido(requestData);
+        } else if (action === 'registrarPago') {
+            result = registrarPago(requestData);
+        } else if (action === 'anularPago') {
+            result = anularPago(requestData);
         } else {
             result = { status: "error", message: "Acción POST no reconocida." };
         }
@@ -1870,4 +1884,348 @@ function enviarCorreoPedido(data) {
             };
         }
     }
+}
+
+// ======================================================================
+// MÓDULO DE PAGOS Y CARTERA (ABONOS ESTILO ODOO)
+// ======================================================================
+
+/**
+ * Obtiene o crea la hoja de Pagos con sus encabezados.
+ */
+function getOrCreatePagosSheet() {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(HOJA_PAGOS);
+    if (!sheet) {
+        sheet = ss.insertSheet(HOJA_PAGOS);
+        sheet.appendRow(PAGOS_HEADERS);
+        sheet.setFrozenRows(1);
+    }
+    return sheet;
+}
+
+/**
+ * Obtiene todos los pagos registrados para un pedido.
+ * @param {Object} params { pedidoId }
+ */
+function getPagosPedido(params) {
+    if (!params || !params.pedidoId) {
+        return { status: 'error', message: 'Se requiere pedidoId.' };
+    }
+    var targetId = String(params.pedidoId).trim();
+    var sheet = getOrCreatePagosSheet();
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var pagos = [];
+
+    // Helper para encontrar índice (case-insensitive)
+    function getIdx(keys, fallback) {
+        for (var i = 0; i < headers.length; i++) {
+            var h = String(headers[i]).toLowerCase().trim();
+            for (var k = 0; k < keys.length; k++) {
+                if (h === keys[k]) return i;
+            }
+        }
+        return fallback;
+    }
+
+    var pIdIndex = getIdx(['pedido_id', 'pedido id', 'pedido', 'id pedido'], 1);
+    var montoIndex = getIdx(['monto', 'valor', 'total'], 4);
+    var fechaIndex = getIdx(['fecha', 'fecha_pago', 'fecha pago'], 3);
+    var metodoIndex = getIdx(['metodo_pago', 'método de pago', 'método', 'metodo'], 5);
+    var refIndex = getIdx(['referencia', 'ref', 'comprobante'], 6);
+
+    for (var i = 1; i < data.length; i++) {
+        if (String(data[i][pIdIndex]).trim() === targetId) {
+            var row = {};
+            for (var h = 0; h < headers.length; h++) row[headers[h] || 'col_' + h] = data[i][h];
+
+            // Garantizar claves mínimas para el frontend
+            row.pedido_id = data[i][pIdIndex];
+            row.monto = data[i][montoIndex];
+            row.fecha = data[i][fechaIndex];
+            row.metodo = data[i][metodoIndex];
+            row.referencia = data[i][refIndex];
+
+            if (row.fecha instanceof Date) row.fecha = row.fecha.toISOString().split('T')[0];
+            if (row.fecha_registro instanceof Date) row.fecha_registro = row.fecha_registro.toISOString();
+            pagos.push(row);
+        }
+    }
+
+    // Ordenar por fecha ascendente
+    pagos.sort(function (a, b) { return new Date(a.fecha) - new Date(b.fecha); });
+
+    // Calcular resumen
+    var totalPagado = pagos.reduce(function (s, p) { return s + (parseFloat(p.monto) || 0); }, 0);
+
+    return {
+        status: 'success',
+        pagos: pagos,
+        totalPagado: totalPagado,
+        count: pagos.length
+    };
+}
+
+/**
+ * Registra un nuevo abono (pago) para un pedido.
+ * Recalcula estado_pago y total_pagado en la hoja Pedidos.
+ * @param {Object} data { pedidoId, fecha, monto, metodoPago, referencia?, notas?, usuario?, forzarPagado? }
+ */
+function registrarPago(data) {
+    if (!data || !data.pedidoId || !data.monto) {
+        return { status: 'error', message: 'Faltan parámetros: pedidoId o monto.' };
+    }
+
+    var monto = parseFloat(data.monto);
+    if (isNaN(monto) || monto <= 0) {
+        return { status: 'error', message: 'El monto debe ser un número positivo.' };
+    }
+
+    var targetId = String(data.pedidoId).trim();
+    var ss = getSpreadsheet();
+
+    // 1. Verificar que el pedido existe y está en estado válido para pagos
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    if (!pedidosSheet) return { status: 'error', message: 'Hoja de Pedidos no encontrada.' };
+
+    var pedidosData = pedidosSheet.getDataRange().getValues();
+    var pedHdr = pedidosData[0];
+    var pedRowIndex = -1;
+    var pedido = null;
+
+    for (var i = 1; i < pedidosData.length; i++) {
+        if (String(pedidosData[i][0]).trim() === targetId) {
+            pedRowIndex = i;
+            pedido = {};
+            for (var h = 0; h < pedHdr.length; h++) pedido[pedHdr[h]] = pedidosData[i][h];
+            break;
+        }
+    }
+
+    if (!pedido) return { status: 'error', message: 'Pedido ' + targetId + ' no encontrado.' };
+
+    var estadoPedido = String(pedido.estado || '').toLowerCase();
+    if (estadoPedido === 'borrador' || estadoPedido === 'cancelado') {
+        return { status: 'error', message: 'Solo se pueden registrar pagos en pedidos confirmados o completados.' };
+    }
+
+    var totalPedido = parseFloat(pedido.total) || 0;
+
+    // 2. Calcular total ya pagado (sumando todos los pagos anteriores)
+    var pagosSheet = getOrCreatePagosSheet();
+    var pagosData = pagosSheet.getDataRange().getValues();
+    var pagosHdr = pagosData[0];
+    var totalYaPagado = 0;
+
+    function getIdxP(keys, fallback) {
+        for (var i = 0; i < pagosHdr.length; i++) {
+            var h = String(pagosHdr[i]).toLowerCase().trim();
+            for (var k = 0; k < keys.length; k++) {
+                if (h === keys[k]) return i;
+            }
+        }
+        return fallback;
+    }
+    var idIndex = getIdxP(['id', 'codigo', 'código'], 0);
+    var pIdIndex = getIdxP(['pedido_id', 'pedido id', 'pedido', 'id pedido'], 1);
+    var tipoIndex = getIdxP(['tipo_pedido', 'tipo'], 2);
+    var fechaIndex = getIdxP(['fecha', 'fecha_pago', 'fecha pago'], 3);
+    var montoIndex = getIdxP(['monto', 'valor', 'total'], 4);
+    var metodoIndex = getIdxP(['metodo_pago', 'método de pago', 'método', 'metodo'], 5);
+    var refIndex = getIdxP(['referencia', 'ref', 'comprobante'], 6);
+    var notaIndex = getIdxP(['notas', 'nota', 'observaciones'], 7);
+    var usuIndex = getIdxP(['usuario', 'user'], 8);
+    var fecRegIndex = getIdxP(['fecha_registro', 'fecha_creacion', 'created'], 9);
+
+    for (var p = 1; p < pagosData.length; p++) {
+        if (String(pagosData[p][pIdIndex]).trim() === targetId) {
+            totalYaPagado += parseFloat(pagosData[p][montoIndex]) || 0;
+        }
+    }
+
+    var saldoPendiente = totalPedido - totalYaPagado;
+    if (saldoPendiente <= 0) {
+        return { status: 'error', message: 'Este pedido ya está completamente pagado.' };
+    }
+
+    // Ajustar monto si supera el saldo
+    if (monto > saldoPendiente + 0.01) {
+        monto = saldoPendiente; // no permitir sobrepago
+    }
+
+    // 3. Generar ID de pago
+    var pagoId = 'PAG-' + new Date().getTime().toString(36).toUpperCase();
+
+    // 4. Insertar el pago usando los índices dinámicos
+    var fechaPago = data.fecha ? new Date(data.fecha) : new Date();
+    var newRow = new Array(pagosHdr.length);
+    for (var idx = 0; idx < pagosHdr.length; idx++) newRow[idx] = ''; // rellenar vacíos
+
+    if (idIndex < newRow.length) newRow[idIndex] = pagoId;
+    if (pIdIndex < newRow.length) newRow[pIdIndex] = targetId;
+    if (tipoIndex < newRow.length) newRow[tipoIndex] = String(pedido.tipo || '').toLowerCase();
+    if (fechaIndex < newRow.length) newRow[fechaIndex] = fechaPago;
+    if (montoIndex < newRow.length) newRow[montoIndex] = monto;
+    if (metodoIndex < newRow.length) newRow[metodoIndex] = data.metodoPago || data.metodo_pago || 'Efectivo';
+    if (refIndex < newRow.length) newRow[refIndex] = data.referencia || '';
+    if (notaIndex < newRow.length) newRow[notaIndex] = data.notas || '';
+    if (usuIndex < newRow.length) newRow[usuIndex] = data.usuario || 'Sistema';
+    if (fecRegIndex < newRow.length) newRow[fecRegIndex] = new Date();
+
+    pagosSheet.appendRow(newRow);
+
+    // 5. Recalcular estado_pago y total_pagado en el pedido
+    var nuevoTotalPagado = totalYaPagado + monto;
+    var nuevoEstadoPago;
+
+    if (data.forzarPagado || Math.abs(nuevoTotalPagado - totalPedido) < 1) {
+        nuevoEstadoPago = 'pagado';
+    } else if (nuevoTotalPagado >= totalPedido) {
+        nuevoEstadoPago = 'pagado';
+    } else {
+        nuevoEstadoPago = 'parcial';
+    }
+
+    // Actualizar columnas estado_pago y total_pagado en la hoja Pedidos
+    var colEstadoPago = pedHdr.indexOf('estado_pago');
+    var colTotalPagado = pedHdr.indexOf('total_pagado');
+    var colFechaUpd = pedHdr.indexOf('fecha_actualizado');
+
+    if (colEstadoPago >= 0) {
+        pedidosSheet.getRange(pedRowIndex + 1, colEstadoPago + 1).setValue(nuevoEstadoPago);
+    }
+    if (colTotalPagado >= 0) {
+        pedidosSheet.getRange(pedRowIndex + 1, colTotalPagado + 1).setValue(nuevoTotalPagado);
+    }
+    if (colFechaUpd >= 0) {
+        pedidosSheet.getRange(pedRowIndex + 1, colFechaUpd + 1).setValue(new Date());
+    }
+
+    // 6. Registrar en chatter
+    var saldo = totalPedido - nuevoTotalPagado;
+    var msgChatter = 'Pago registrado: <strong>$' + nuevoTotalPagado.toLocaleString('es-CO') +
+        '</strong> de <strong>$' + totalPedido.toLocaleString('es-CO') + '</strong>' +
+        ' (' + (data.metodoPago || 'Efectivo') + ').' +
+        (nuevoEstadoPago === 'pagado'
+            ? ' ✅ <strong>Pedido completamente pagado.</strong>'
+            : ' Saldo pendiente: $' + saldo.toLocaleString('es-CO'));
+
+    addChatMessage({
+        referenciaId: targetId,
+        modulo: 'pedido',
+        tipo: 'pago',
+        mensaje: msgChatter,
+        usuario: data.usuario || 'Sistema'
+    });
+
+    return {
+        status: 'success',
+        pagoId: pagoId,
+        totalPagado: nuevoTotalPagado,
+        saldoPendiente: Math.max(0, totalPedido - nuevoTotalPagado),
+        estadoPago: nuevoEstadoPago,
+        message: 'Pago ' + pagoId + ' registrado correctamente.'
+    };
+}
+
+/**
+ * Anula un pago (abono) específico.
+ * Recalcula el estado de pago del pedido.
+ * @param {Object} data { pagoId, pedidoId, motivo?, usuario? }
+ */
+function anularPago(data) {
+    if (!data || !data.pagoId || !data.pedidoId) {
+        return { status: 'error', message: 'Faltan parámetros: pagoId o pedidoId.' };
+    }
+
+    var targetPagoId = String(data.pagoId).trim();
+    var targetPedidoId = String(data.pedidoId).trim();
+    var ss = getSpreadsheet();
+    var pagosSheet = getOrCreatePagosSheet();
+    var pagosData = pagosSheet.getDataRange().getValues();
+    var pagosHdr = pagosData[0];
+
+    function getIdxP(keys, fallback) {
+        for (var i = 0; i < pagosHdr.length; i++) {
+            var h = String(pagosHdr[i]).toLowerCase().trim();
+            for (var k = 0; k < keys.length; k++) {
+                if (h === keys[k]) return i;
+            }
+        }
+        return fallback;
+    }
+    var idIndex = getIdxP(['id', 'codigo', 'código'], 0);
+    var pIdIndex = getIdxP(['pedido_id', 'pedido id', 'pedido', 'id pedido'], 1);
+    var montoIndex = getIdxP(['monto', 'valor', 'total'], 4);
+
+    // Buscar el pago
+    var pagoRowIndex = -1;
+    var pagoMonto = 0;
+    for (var p = 1; p < pagosData.length; p++) {
+        if (String(pagosData[p][idIndex]).trim() === targetPagoId &&
+            String(pagosData[p][pIdIndex]).trim() === targetPedidoId) {
+            pagoRowIndex = p;
+            pagoMonto = parseFloat(pagosData[p][montoIndex]) || 0;
+            break;
+        }
+    }
+
+    if (pagoRowIndex < 0) {
+        return { status: 'error', message: 'Pago ' + targetPagoId + ' no encontrado.' };
+    }
+
+    // Eliminar la fila del pago (o marcarla como anulada)
+    // Usamos eliminación directa para simplificar
+    pagosSheet.deleteRow(pagoRowIndex + 1);
+
+    // Recalcular estado_pago del pedido
+    var pedidosSheet = ss.getSheetByName(HOJA_PEDIDOS);
+    var pedidosData = pedidosSheet.getDataRange().getValues();
+    var pedHdr = pedidosData[0];
+    var pedRowIndex = -1;
+    var totalPedido = 0;
+
+    for (var i = 1; i < pedidosData.length; i++) {
+        if (String(pedidosData[i][0]).trim() === targetPedidoId) {
+            pedRowIndex = i;
+            totalPedido = parseFloat(pedidosData[i][pedHdr.indexOf('total')]) || 0;
+            break;
+        }
+    }
+
+    if (pedRowIndex < 0) return { status: 'error', message: 'Pedido no encontrado para recalcular.' };
+
+    // Sumar pagos restantes
+    var nuevaPagosData = pagosSheet.getDataRange().getValues();
+    var nuevoTotal = 0;
+    for (var r = 1; r < nuevaPagosData.length; r++) {
+        if (String(nuevaPagosData[r][pIdIndex]).trim() === targetPedidoId) {
+            nuevoTotal += parseFloat(nuevaPagosData[r][montoIndex]) || 0;
+        }
+    }
+
+    var nuevoEstado = nuevoTotal <= 0 ? 'sin_pago' : (nuevoTotal >= totalPedido ? 'pagado' : 'parcial');
+    var colEstadoPago = pedHdr.indexOf('estado_pago');
+    var colTotalPagado = pedHdr.indexOf('total_pagado');
+
+    if (colEstadoPago >= 0) pedidosSheet.getRange(pedRowIndex + 1, colEstadoPago + 1).setValue(nuevoEstado);
+    if (colTotalPagado >= 0) pedidosSheet.getRange(pedRowIndex + 1, colTotalPagado + 1).setValue(nuevoTotal);
+
+    // Registrar en chatter
+    addChatMessage({
+        referenciaId: targetPedidoId,
+        modulo: 'pedido',
+        tipo: 'sistema',
+        mensaje: 'Pago <strong>' + targetPagoId + '</strong> anulado.' +
+            (data.motivo ? ' Motivo: ' + data.motivo : ''),
+        usuario: data.usuario || 'Sistema'
+    });
+
+    return {
+        status: 'success',
+        estadoPago: nuevoEstado,
+        totalPagado: nuevoTotal,
+        message: 'Pago ' + targetPagoId + ' anulado.'
+    };
 }
