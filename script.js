@@ -2097,11 +2097,15 @@ async function openOrderDetails(pedidoId, tipo) {
     // ── Botones post-openModal (para no ser sobreescritos por animación) ──
     const emailBtn = document.getElementById('mord_email_btn');
     const pagoBtn = document.getElementById('mord_pago_btn');
+    const printBtn = document.getElementById('mord_print_receipt_btn');
     const pagoBanner = document.getElementById('mord_pago_banner');
     const pagosSection = document.getElementById('mord_pagos_section');
 
     // Email: visible siempre excepto cancelados
     if (emailBtn) emailBtn.style.display = estadoNorm !== 'cancelado' ? 'inline-flex' : 'none';
+
+    // Print Receipt: solo para ventas y no cancelados
+    if (printBtn) printBtn.style.display = (!isCompra && estadoNorm !== 'cancelado') ? 'inline-flex' : 'none';
 
     // Pago: solo para confirmados o completados (no borradores ni cancelados)
     const permitesPago = (estadoNorm === 'confirmado' || estadoNorm === 'completado');
@@ -3090,10 +3094,36 @@ async function anularPagoFrontend(pagoId, pedidoId) {
 }
 
 function printReceipt() {
-    if (!currentPedidoData) return;
-    const calc = calculateOrderTotals(currentPedidoData);
+    if (!mordCurrentPedido) return;
+
+    let items = [];
+    try { items = typeof mordCurrentPedido.items === 'string' ? JSON.parse(mordCurrentPedido.items) : mordCurrentPedido.items; } catch (e) { }
+    if (!items) items = [];
+
+    let subtotalGeneral = 0;
+    items.forEach(it => {
+        subtotalGeneral += (parseFloat(it.cantidad) || 0) * (parseFloat(it.precio) || 0);
+    });
+
+    const descuentoPct = parseFloat(mordCurrentPedido.descuento) || 0;
+    const descuentoVal = subtotalGeneral * (descuentoPct / 100);
+    const subtotalConDescuento = subtotalGeneral - descuentoVal;
+
+    const totalGuardado = parseFloat(mordCurrentPedido.total) || 0;
+    let iva = 0;
+    if (Math.abs(totalGuardado - (subtotalConDescuento * 1.19)) < 10) {
+        iva = subtotalConDescuento * 0.19;
+    }
+
+    const calc = {
+        base: subtotalGeneral,
+        descuento: descuentoVal,
+        iva: iva,
+        total: totalGuardado > 0 ? totalGuardado : (subtotalConDescuento + iva)
+    };
+
     let html = `
-    <html><head><title>Recibo - ${currentPedidoData.id}</title>
+    <html><head><title>Recibo - ${mordCurrentPedido.id}</title>
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 40px; }
         .header { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; }
@@ -3114,18 +3144,16 @@ function printReceipt() {
     </style></head><body>
     <div class="header">
         <div><h1 class="title">TechFix Solutions</h1><div style="color:#64748b; margin-top:10px; font-size:14px;">Nit: 900.000.000-1<br>Bogotá, Colombia</div></div>
-        <div style="text-align:right;"><div class="title" style="color:#0ea5e9;">${currentPedidoData.tipo === 'venta' ? 'Factura de Venta' : 'Cotización'}</div><div style="font-size:18px; color:#64748b; margin-top:5px;"># ${currentPedidoData.id}</div></div>
+        <div style="text-align:right;"><div class="title" style="color:#0ea5e9;">${mordCurrentPedido.tipo === 'venta' ? 'Factura de Venta' : 'Cotización'}</div><div style="font-size:18px; color:#64748b; margin-top:5px;"># ${mordCurrentPedido.id}</div></div>
     </div>
     <div class="info-grid">
-        <div><div class="label">Cliente</div><div class="val" style="font-size:16px;">${currentPedidoData.contacto || 'Cliente Mostrador'}</div></div>
-        <div><div class="label">Fecha</div><div class="val">${new Date(currentPedidoData.fecha).toLocaleDateString()}</div></div>
+        <div><div class="label">Cliente</div><div class="val" style="font-size:16px;">${mordCurrentPedido.contacto || 'Cliente Mostrador'}</div></div>
+        <div><div class="label">Fecha</div><div class="val">${new Date(mordCurrentPedido.fecha).toLocaleDateString()}</div></div>
     </div>
     <table><thead><tr><th>Descripción</th><th class="text-right">Cantidad</th><th class="text-right">Precio Unitario</th><th class="text-right">Subtotal</th></tr></thead><tbody>`;
 
-    let items = [];
-    try { items = typeof currentPedidoData.items === 'string' ? JSON.parse(currentPedidoData.items) : currentPedidoData.items; } catch (e) { }
     items.forEach(it => {
-        html += `<tr><td>${it.nombre}</td><td class="text-right">${parseFloat(it.cantidad)}</td><td class="text-right">${formatCOP(it.precio)}</td><td class="text-right">${formatCOP(it.cantidad * it.precio)}</td></tr>`;
+        html += `<tr><td>${it.nombre || it.producto_id || 'Producto'}</td><td class="text-right">${parseFloat(it.cantidad)}</td><td class="text-right">${formatCOP(it.precio)}</td><td class="text-right">${formatCOP(it.cantidad * it.precio)}</td></tr>`;
     });
 
     html += `</tbody></table>
