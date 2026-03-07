@@ -79,6 +79,12 @@
                     <i class="fas fa-cash-register nav-icon"></i>
                     <span class="nav-label">Ventas</span>
                 </a>
+
+                <a href="pos.html" data-section="pos" data-tooltip="PV POS">
+                    <i class="fas fa-shopping-cart nav-icon"></i>
+                    <span class="nav-label">PV POS</span>
+                </a>
+
                 <a href="#pedidos" data-section="pedidos" data-tooltip="Historial Pedidos">
                     <i class="fas fa-file-invoice nav-icon"></i>
                     <span class="nav-label">Historial Pedidos</span>
@@ -295,6 +301,12 @@
                     <div class="form-group" id="p_stock_group">
                         <label for="p_stock">Stock Inicial:</label>
                         <input type="number" id="p_stock" required min="0" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="p_imagen_file">Imagen del Producto (Opcional):</label>
+                        <input type="file" id="p_imagen_file" accept="image/*" style="padding:6px;">
+                        <img id="p_imagen_preview" src="" alt="Vista previa"
+                            style="display:none;margin-top:8px;max-height:120px;border-radius:8px;border:1px solid #ddd;object-fit:cover;">
                     </div>
 
                     <button type="submit" class="btn primary-btn full-width">
@@ -711,21 +723,98 @@
 
             <!-- Sección 7: Configuración -->
             <section id="configuracion" class="content-section">
-                <h2><i class="fas fa-cog"></i> Configuración de Base de Datos</h2>
-                <div class="config-actions">
-                    <p>Esta acción **creará/verificará** las pestañas necesarias en Google Sheet.</p>
-                    <button id="iniciarDBBtn" class="btn primary-btn">
-                        <i class="fas fa-play-circle"></i> Iniciar Base de Datos
-                    </button>
+                <h2><i class="fas fa-cog"></i> Configuración</h2>
 
-                    <p class="warning-text" style="color: var(--danger-color); font-weight: bold; margin-top: 20px;">
-                        ¡ADVERTENCIA! Esta acción eliminará **TODOS** los datos.
+                <!-- === DATOS DE EMPRESA === -->
+                <div
+                    style="background:white;padding:24px;border-radius:12px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                    <h3 style="margin-top:0;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-building" style="color:var(--primary-color);"></i>
+                        Datos de la Empresa
+                    </h3>
+                    <p style="color:#666;font-size:0.9rem;margin-bottom:20px;">
+                        Esta información aparecerá en las tirillas, facturas y comprobantes de venta.
                     </p>
-                    <button id="resetDBBtn" class="btn danger-btn">
-                        <i class="fas fa-sync-alt"></i> Resetear Base de Datos
-                    </button>
+
+                    <!-- Logo actual + subida -->
+                    <div
+                        style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:#f8f9fa;border-radius:10px;border:1px solid #eee;">
+                        <div>
+                            <img id="empresa_logo_preview" src="" alt="Logo"
+                                style="width:80px;height:80px;object-fit:contain;border-radius:8px;border:1px solid #ddd;background:#fff;display:none;">
+                            <div id="empresa_logo_placeholder"
+                                style="width:80px;height:80px;border-radius:8px;border:2px dashed #ddd;display:flex;align-items:center;justify-content:center;color:#aaa;">
+                                <i class="fas fa-image fa-2x"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-weight:600;display:block;margin-bottom:6px;">Logo de la Empresa</label>
+                            <input type="file" id="empresa_logo_file" accept="image/*" style="font-size:0.9rem;">
+                            <p style="font-size:0.8rem;color:#888;margin:4px 0 0;">PNG o JPG recomendado. Se guardará en
+                                Drive.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="empresa_nombre"><i class="fas fa-building"></i> Nombre / Razón Social</label>
+                            <input type="text" id="empresa_nombre" placeholder="Ej: Ferretería El Tornillo S.A.S">
+                        </div>
+                        <div class="form-group">
+                            <label for="empresa_nit"><i class="fas fa-id-card"></i> NIT / RUT</label>
+                            <input type="text" id="empresa_nit" placeholder="Ej: 900.123.456-7">
+                        </div>
+                        <div class="form-group">
+                            <label for="empresa_telefono"><i class="fas fa-phone"></i> Teléfono</label>
+                            <input type="text" id="empresa_telefono" placeholder="Ej: +57 300 123 4567">
+                        </div>
+                        <div class="form-group">
+                            <label for="empresa_email"><i class="fas fa-envelope"></i> Email</label>
+                            <input type="email" id="empresa_email" placeholder="correo@empresa.com">
+                        </div>
+                        <div class="form-group" style="grid-column:1/-1;">
+                            <label for="empresa_direccion"><i class="fas fa-map-marker-alt"></i> Dirección</label>
+                            <input type="text" id="empresa_direccion" placeholder="Ej: Calle 10 # 5-30, Bogotá">
+                        </div>
+                        <div class="form-group">
+                            <label for="empresa_ciudad"><i class="fas fa-city"></i> Ciudad</label>
+                            <input type="text" id="empresa_ciudad" placeholder="Ej: Bogotá, Colombia">
+                        </div>
+                        <div class="form-group">
+                            <label for="empresa_web"><i class="fas fa-globe"></i> Sitio Web (Opcional)</label>
+                            <input type="text" id="empresa_web" placeholder="www.miempresa.com">
+                        </div>
+                        <div class="form-group" style="grid-column:1/-1;">
+                            <label for="empresa_slogan"><i class="fas fa-quote-right"></i> Slogan (Opcional)</label>
+                            <input type="text" id="empresa_slogan" placeholder="Ej: Calidad y servicio a tu alcance">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:4px;">
+                        <button id="btn_guardar_empresa" class="btn primary-btn">
+                            <i class="fas fa-save"></i> Guardar Datos Empresa
+                        </button>
+                        <div id="statusEmpresa" class="status-message" style="flex:1;margin:0;"></div>
+                    </div>
                 </div>
-                <div id="statusConfig" class="status-message"></div>
+
+                <!-- === CONFIGURACIÓN DB === -->
+                <div style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                    <h3 style="margin-top:0;"><i class="fas fa-database"></i> Configuración de Base de Datos</h3>
+                    <div class="config-actions">
+                        <p>Esta acción <strong>creará/verificará</strong> las pestañas necesarias en Google Sheet.</p>
+                        <button id="iniciarDBBtn" class="btn primary-btn">
+                            <i class="fas fa-play-circle"></i> Iniciar Base de Datos
+                        </button>
+                        <p class="warning-text"
+                            style="color: var(--danger-color); font-weight: bold; margin-top: 20px;">
+                            ¡ADVERTENCIA! Esta acción eliminará <strong>TODOS</strong> los datos.
+                        </p>
+                        <button id="resetDBBtn" class="btn danger-btn">
+                            <i class="fas fa-sync-alt"></i> Resetear Base de Datos
+                        </button>
+                    </div>
+                    <div id="statusConfig" class="status-message"></div>
+                </div>
             </section>
         </main>
     </div>
@@ -1101,6 +1190,13 @@
                     <div class="form-group" id="modal_prod_stock_group">
                         <label>Stock:</label>
                         <input type="number" id="modal_prod_stock" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Imagen del Producto:</label>
+                        <img id="modal_prod_imagen_preview" src="" alt="Imagen actual"
+                            style="display:none;max-height:100px;border-radius:8px;border:1px solid #ddd;object-fit:cover;margin-bottom:8px;width:100%;">
+                        <input type="file" id="modal_prod_imagen_file" accept="image/*" style="padding:6px;">
+                        <small style="color:#888;">Deja en blanco para mantener la imagen actual.</small>
                     </div>
                 </div>
                 <div id="modal_prod_status" class="status-message"></div>

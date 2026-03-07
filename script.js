@@ -76,8 +76,10 @@ function setupNavigation() {
 
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
-            e.preventDefault();
             const targetId = link.getAttribute('data-section');
+            if (targetId === 'pos') return; // Permite el comportamiento por defecto (redirigir)
+
+            e.preventDefault();
 
             navLinks.forEach(l => l.classList.remove('active'));
             link.classList.add('active');
@@ -519,6 +521,10 @@ function setupForms() {
         }
     });
 
+    // === DATOS DE EMPRESA ===
+    setupEmpresaForm();
+
+
     // User Management Section
     document.getElementById('newUserForm').addEventListener('submit', handleCreateUser);
     document.getElementById('refreshUsersBtn').addEventListener('click', loadUsers);
@@ -555,6 +561,23 @@ function setupForms() {
             } else {
                 stockGroup.style.display = '';
                 stockInput.setAttribute('required', 'required');
+            }
+        });
+    }
+
+    // Preview de imagen al seleccionar archivo en el formulario de registro
+    const imgFileInput = document.getElementById('p_imagen_file');
+    const imgPreview = document.getElementById('p_imagen_preview');
+    if (imgFileInput && imgPreview) {
+        imgFileInput.addEventListener('change', () => {
+            const f = imgFileInput.files[0];
+            if (f) {
+                const reader = new FileReader();
+                reader.onload = (ev) => { imgPreview.src = ev.target.result; imgPreview.style.display = 'block'; };
+                reader.readAsDataURL(f);
+            } else {
+                imgPreview.style.display = 'none';
+                imgPreview.src = '';
             }
         });
     }
@@ -1226,11 +1249,26 @@ async function handlePostAction(e, action, statusDivId) {
 
     const data = {};
     Array.from(form.elements).forEach(input => {
-        if (input.id && (input.id.startsWith('p_') || input.id.startsWith('c_'))) {
+        if (input.id && (input.id.startsWith('p_') || input.id.startsWith('c_')) && input.type !== 'file') {
             data[input.id.replace(/p_|c_/, '')] = input.value;
         }
     });
     data.action = action;
+
+    // Manejo de imagen: leer archivo y convertir a base64
+    const fileInput = document.getElementById('p_imagen_file');
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        data.imagen_base64 = base64;
+        data.imagen_mime = file.type;
+        data.imagen_nombre = file.name;
+    }
 
     try {
         const response = await fetch(SCRIPT_URL, {
@@ -1243,6 +1281,9 @@ async function handlePostAction(e, action, statusDivId) {
         if (responseData.status === 'success') {
             displayStatus(statusDivId, 'success', responseData.message);
             form.reset();
+            // Ocultar preview tras guardar
+            const preview = document.getElementById('p_imagen_preview');
+            if (preview) { preview.style.display = 'none'; preview.src = ''; }
             if (action === 'agregarCategoria') {
                 loadInitialData();
             }
@@ -1397,11 +1438,13 @@ function renderInventarioTable(productos) {
         const tipo = p.tipo || "Inventariable";
         const stockDisplay = tipo === "Servicio" ? "N/A" : p.stock;
         const stockStyle = (tipo === "Inventariable" && p.stock < 5) ? 'style="color: var(--danger-color); font-weight: bold;"' : '';
+        const IMG_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Crect width='30' height='30' fill='%23e0e0e0' rx='4'/%3E%3Ctext x='15' y='20' font-size='10' text-anchor='middle' fill='%23888'%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E";
+        const imgHtml = p.imagen_url ? `<img src="${p.imagen_url}" style="width:30px;height:30px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;" onerror="this.src='${IMG_FALLBACK}'">` : '';
 
         return `
             <tr>
                 <td><small style="color:#888;">${p.id}</small></td>
-                <td>${p.nombre}</td>
+                <td><div style="display:flex;align-items:center;">${imgHtml}<span>${p.nombre}</span></div></td>
                 <td>${p.código || p.codigo || ''}</td>
                 <td>${p.categoría || p.categoria || ''}</td>
                 <td><span style="padding: 4px 8px; border-radius: 6px; font-size: 0.85em; background: ${tipo === 'Servicio' ? '#e3f2fd' : '#f1f8e9'}; color: ${tipo === 'Servicio' ? '#1976d2' : '#558b2f'};">${tipo}</span></td>
@@ -1430,6 +1473,28 @@ function openEditProductModal(id) {
     document.getElementById('modal_prod_pventa').value = product.precio_venta || 0;
     document.getElementById('modal_prod_stock').value = product.stock || 0;
     document.getElementById('modal_prod_status').style.display = 'none';
+
+    // Mostrar imagen actual si existe
+    const imgPreview = document.getElementById('modal_prod_imagen_preview');
+    const fileInput = document.getElementById('modal_prod_imagen_file');
+    fileInput.value = ''; // limpiar selección previa
+    if (product.imagen_url) {
+        imgPreview.src = product.imagen_url;
+        imgPreview.style.display = 'block';
+    } else {
+        imgPreview.style.display = 'none';
+        imgPreview.src = '';
+    }
+
+    // Preview al seleccionar nuevo archivo
+    fileInput.onchange = () => {
+        const f = fileInput.files[0];
+        if (f) {
+            const reader = new FileReader();
+            reader.onload = (ev) => { imgPreview.src = ev.target.result; imgPreview.style.display = 'block'; };
+            reader.readAsDataURL(f);
+        }
+    };
 
     // Poblar select de categorías
     const catSelect = document.getElementById('modal_prod_categoria');
@@ -1461,8 +1526,25 @@ function openEditProductModal(id) {
             tipo: document.getElementById('modal_prod_tipo').value,
             precio_compra: document.getElementById('modal_prod_pcompra').value,
             precio_venta: document.getElementById('modal_prod_pventa').value,
-            stock: document.getElementById('modal_prod_stock').value
+            stock: document.getElementById('modal_prod_stock').value,
         };
+
+        // Si hay nuevo archivo, enviarlo como base64; si no, conservar la URL actual
+        const file = fileInput.files[0];
+        if (file) {
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            payload.imagen_base64 = base64;
+            payload.imagen_mime = file.type;
+            payload.imagen_nombre = file.name;
+        } else {
+            // Mantener la URL existente si no se eligió nuevo archivo
+            payload.imagen_url = product.imagen_url || '';
+        }
 
         try {
             const res = await fetch(SCRIPT_URL, {
@@ -3188,4 +3270,126 @@ function printReceipt() {
     } else {
         showToast('El navegador bloqueó la ventana emergente de impresión', 'warning');
     }
+}
+
+// ============================================================
+// CONFIGURACIÓN DE EMPRESA
+// ============================================================
+async function setupEmpresaForm() {
+    // Cargar datos actuales desde el backend
+    try {
+        const res = await fetch(`${SCRIPT_URL}?action=getEmpresa`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            const e = data.data;
+            setEmpresaField('empresa_nombre', e.nombre);
+            setEmpresaField('empresa_nit', e.nit);
+            setEmpresaField('empresa_telefono', e.telefono);
+            setEmpresaField('empresa_email', e.email);
+            setEmpresaField('empresa_direccion', e.direccion);
+            setEmpresaField('empresa_ciudad', e.ciudad);
+            setEmpresaField('empresa_web', e.web);
+            setEmpresaField('empresa_slogan', e.slogan);
+
+            // Guardar en localStorage para uso del POS
+            localStorage.setItem('empresa_data', JSON.stringify(e));
+
+            // Mostrar logo si existe
+            if (e.logo_url) {
+                const preview = document.getElementById('empresa_logo_preview');
+                const placeholder = document.getElementById('empresa_logo_placeholder');
+                if (preview) { preview.src = e.logo_url; preview.style.display = 'block'; }
+                if (placeholder) placeholder.style.display = 'none';
+            }
+        }
+    } catch (_) { /* Silencioso si no hay datos aún */ }
+
+    // Preview al seleccionar logo
+    const logoFile = document.getElementById('empresa_logo_file');
+    if (logoFile) {
+        logoFile.addEventListener('change', () => {
+            const f = logoFile.files[0];
+            if (f) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const preview = document.getElementById('empresa_logo_preview');
+                    const placeholder = document.getElementById('empresa_logo_placeholder');
+                    if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
+                    if (placeholder) placeholder.style.display = 'none';
+                };
+                reader.readAsDataURL(f);
+            }
+        });
+    }
+
+    // Guardar
+    const btnGuardar = document.getElementById('btn_guardar_empresa');
+    if (btnGuardar) {
+        btnGuardar.addEventListener('click', async () => {
+            const statusEl = document.getElementById('statusEmpresa');
+            btnGuardar.disabled = true;
+            displayStatus('statusEmpresa', 'info', 'Guardando...');
+
+            const payload = {
+                action: 'guardarEmpresa',
+                nombre: getEmpresaField('empresa_nombre'),
+                nit: getEmpresaField('empresa_nit'),
+                telefono: getEmpresaField('empresa_telefono'),
+                email: getEmpresaField('empresa_email'),
+                direccion: getEmpresaField('empresa_direccion'),
+                ciudad: getEmpresaField('empresa_ciudad'),
+                web: getEmpresaField('empresa_web'),
+                slogan: getEmpresaField('empresa_slogan'),
+            };
+
+            // Subir logo si hay archivo seleccionado
+            const logoFile = document.getElementById('empresa_logo_file');
+            if (logoFile && logoFile.files[0]) {
+                const file = logoFile.files[0];
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                payload.logo_base64 = base64;
+                payload.logo_mime = file.type;
+                payload.logo_nombre = 'logo_empresa_' + file.name;
+            }
+
+            try {
+                const res = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    displayStatus('statusEmpresa', 'success', data.message);
+                    // Actualizar localStorage con los nuevos datos
+                    localStorage.setItem('empresa_data', JSON.stringify(payload));
+                    if (data.logo_url) {
+                        const preview = document.getElementById('empresa_logo_preview');
+                        if (preview) preview.src = data.logo_url;
+                    }
+                } else {
+                    displayStatus('statusEmpresa', 'error', data.message);
+                }
+            } catch (e) {
+                displayStatus('statusEmpresa', 'error', 'Error de conexión: ' + e.message);
+            } finally {
+                btnGuardar.disabled = false;
+            }
+        });
+    }
+}
+
+function setEmpresaField(id, value) {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+}
+
+function getEmpresaField(id) {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
 }

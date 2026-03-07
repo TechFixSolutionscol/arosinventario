@@ -21,8 +21,8 @@ const APP_CONFIG = {
     // Permisos de visibilidad de secciones por rol
     // Cada rol lista las secciones (data-section) que puede ver
     ROLE_PERMISSIONS: {
-        'Admin': ['dashboard', 'inventario', 'productos', 'categorias', 'compras', 'ventas', 'resumenes', 'contactos', 'usuarios', 'configuracion'],
-        'Vendedor': ['dashboard', 'inventario', 'ventas', 'contactos', 'resumenes'],
+        'Admin': ['dashboard', 'inventario', 'productos', 'categorias', 'compras', 'ventas', 'pos', 'resumenes', 'contactos', 'usuarios', 'configuracion'],
+        'Vendedor': ['dashboard', 'inventario', 'ventas', 'pos', 'contactos', 'resumenes'],
         'Bodeguero': ['dashboard', 'inventario', 'productos', 'categorias', 'compras', 'contactos']
     }
 };

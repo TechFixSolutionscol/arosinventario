@@ -15,7 +15,7 @@ const HOJA_USUARIOS = "Usuarios";
 
 // Encabezados
 const CATEGORIAS_HEADERS = ["id", "nombre"];
-const PRODUCTOS_HEADERS = ["id", "nombre", "código", "categoría", "tipo", "precio_compra", "precio_venta", "stock", "fecha_creado"];
+const PRODUCTOS_HEADERS = ["id", "nombre", "código", "categoría", "tipo", "precio_compra", "precio_venta", "stock", "fecha_creado", "imagen_url"];
 const COMPRAS_HEADERS = ["id", "producto_id", "cantidad", "precio_compra", "fecha", "proveedor", "pedido_id"];
 const VENTAS_HEADERS = ["id", "producto_id", "cantidad", "precio_venta", "fecha", "cliente", "pedido_id"];
 const PROVEEDORES_HEADERS = ["id", "tipo_contacto", "identificacion", "nombre", "email", "telefono", "direccion"];
@@ -37,6 +37,38 @@ const LOG_HEADERS = ["id", "referencia_id", "modulo", "tipo", "mensaje", "usuari
 const HOJA_PAGOS = "Pagos";
 const PAGOS_HEADERS = ["id", "pedido_id", "tipo_pedido", "fecha", "monto",
     "metodo_pago", "referencia", "notas", "usuario", "fecha_registro"];
+
+// ***************************************************************
+// 📁 DRIVE: Carpeta destino para imágenes de productos
+// Reemplaza el valor con el ID de tu carpeta en Google Drive
+// (Abre la carpeta en drive.google.com y copia el ID de la URL)
+// ***************************************************************
+const DRIVE_FOLDER_ID = '142BlCYNyjU_P3y8sw9g25CLTW_J9Sljr'; // ← Reemplazar
+
+/**
+ * Sube una imagen en base64 a la carpeta de Drive y retorna la URL pública.
+ * Requiere que el Servicio Avanzado "Drive API v3" esté habilitado en el proyecto.
+ */
+function subirImagenADrive(base64Data, mimeType, fileName) {
+    try {
+        const bytes = Utilities.base64Decode(base64Data);
+        const blob = Utilities.newBlob(bytes, mimeType, fileName);
+        const file = Drive.Files.create(
+            { name: fileName, parents: [DRIVE_FOLDER_ID] },
+            blob,
+            { fields: 'id' }
+        );
+        // Hacer público (lectura)
+        Drive.Permissions.create(
+            { role: 'reader', type: 'anyone' },
+            file.id
+        );
+        return 'https://drive.google.com/thumbnail?id=' + file.id + '&sz=w400-h400';
+    } catch (e) {
+        Logger.log('Error subiendo imagen a Drive: ' + e.message);
+        return ''; // No interrumpir el guardado si falla la imagen
+    }
+}
 
 // Credenciales por defecto (se crearán automáticamente al inicializar la BD)
 const DEFAULT_ADMIN_USER = "admin";
@@ -88,6 +120,8 @@ function doGet(e) {
             result = getPagosPedido(e.parameter);
         } else if (action === "getData" && sheetName) {
             result = getData(sheetName);
+        } else if (action === "getEmpresa") {
+            result = getEmpresa();
         } else {
             result = { status: "error", message: `Acción GET '${action}' no válida o faltan parámetros.` };
         }
@@ -171,6 +205,8 @@ function doPost(e) {
             result = registrarPago(requestData);
         } else if (action === 'anularPago') {
             result = anularPago(requestData);
+        } else if (action === 'guardarEmpresa') {
+            result = guardarEmpresa(requestData);
         } else {
             result = { status: "error", message: "Acción POST no reconocida." };
         }
@@ -362,8 +398,14 @@ function agregarProducto(data) {
     }
 
     const newId = generateUniqueAppId();
-    const tipo = data.tipo || "Inventariable"; // Default to Inventariable
+    const tipo = data.tipo || "Inventariable";
     const stock = tipo === "Servicio" ? 0 : parseInt(data.stock || 0);
+
+    // Subir imagen a Drive si viene en base64
+    let imagen_url = data.imagen_url || '';
+    if (data.imagen_base64 && data.imagen_mime && data.imagen_nombre) {
+        imagen_url = subirImagenADrive(data.imagen_base64, data.imagen_mime, data.imagen_nombre);
+    }
 
     const newRow = [
         newId,
@@ -374,7 +416,8 @@ function agregarProducto(data) {
         parseFloat(data.precio_compra),
         parseFloat(data.precio_venta),
         stock,
-        new Date()
+        new Date(),
+        imagen_url
     ];
 
     try {
@@ -391,7 +434,12 @@ function editarProducto(data) {
     var sheet = ss.getSheetByName(HOJA_PRODUCTOS);
     if (!sheet) return { status: 'error', message: 'Hoja de productos no encontrada.' };
     var values = sheet.getDataRange().getValues();
+    var headers = values[0];
     var targetId = String(data.id).trim();
+
+    // Encontrar índice de columna imagen_url dinámicamente
+    var imagenColIndex = headers.findIndex(function (h) { return String(h).toLowerCase() === 'imagen_url'; });
+
     for (var i = 1; i < values.length; i++) {
         if (String(values[i][0]).trim() === targetId) {
             var row = i + 1;
@@ -402,6 +450,17 @@ function editarProducto(data) {
             if (data.precio_compra !== undefined) sheet.getRange(row, 6).setValue(parseFloat(data.precio_compra));
             if (data.precio_venta !== undefined) sheet.getRange(row, 7).setValue(parseFloat(data.precio_venta));
             if (data.stock !== undefined) sheet.getRange(row, 8).setValue(parseInt(data.stock));
+
+            // Manejar imagen
+            if (imagenColIndex !== -1) {
+                var nueva_url = data.imagen_url || '';
+                // Si viene nueva imagen en base64, subirla a Drive
+                if (data.imagen_base64 && data.imagen_mime && data.imagen_nombre) {
+                    nueva_url = subirImagenADrive(data.imagen_base64, data.imagen_mime, data.imagen_nombre);
+                }
+                sheet.getRange(row, imagenColIndex + 1).setValue(nueva_url);
+            }
+
             return { status: 'success', message: 'Producto actualizado correctamente.' };
         }
     }
@@ -2228,4 +2287,71 @@ function anularPago(data) {
         totalPagado: nuevoTotal,
         message: 'Pago ' + targetPagoId + ' anulado.'
     };
+}
+
+// ============================================================
+// CONFIGURACIÓN DE EMPRESA
+// ============================================================
+
+/**
+ * Guarda los datos de la empresa en las Script Properties.
+ * Si viene imagen en base64, la sube a Drive y guarda la URL.
+ */
+function guardarEmpresa(data) {
+    try {
+        var props = PropertiesService.getScriptProperties();
+
+        // Si viene logo en base64, subirlo a Drive
+        var logo_url = data.logo_url || props.getProperty('empresa_logo_url') || '';
+        if (data.logo_base64 && data.logo_mime && data.logo_nombre) {
+            logo_url = subirImagenADrive(data.logo_base64, data.logo_mime, data.logo_nombre);
+        }
+
+        var campos = {
+            'empresa_nombre': data.nombre || '',
+            'empresa_nit': data.nit || '',
+            'empresa_telefono': data.telefono || '',
+            'empresa_email': data.email || '',
+            'empresa_direccion': data.direccion || '',
+            'empresa_ciudad': data.ciudad || '',
+            'empresa_web': data.web || '',
+            'empresa_slogan': data.slogan || '',
+            'empresa_logo_url': logo_url
+        };
+
+        props.setProperties(campos);
+
+        return {
+            status: 'success',
+            message: 'Datos de empresa guardados correctamente.',
+            logo_url: logo_url
+        };
+    } catch (e) {
+        return { status: 'error', message: 'Error al guardar: ' + e.message };
+    }
+}
+
+/**
+ * Retorna los datos de la empresa almacenados en Script Properties.
+ */
+function getEmpresa() {
+    try {
+        var props = PropertiesService.getScriptProperties();
+        return {
+            status: 'success',
+            data: {
+                nombre: props.getProperty('empresa_nombre') || '',
+                nit: props.getProperty('empresa_nit') || '',
+                telefono: props.getProperty('empresa_telefono') || '',
+                email: props.getProperty('empresa_email') || '',
+                direccion: props.getProperty('empresa_direccion') || '',
+                ciudad: props.getProperty('empresa_ciudad') || '',
+                web: props.getProperty('empresa_web') || '',
+                slogan: props.getProperty('empresa_slogan') || '',
+                logo_url: props.getProperty('empresa_logo_url') || ''
+            }
+        };
+    } catch (e) {
+        return { status: 'error', message: 'Error al obtener datos: ' + e.message };
+    }
 }
